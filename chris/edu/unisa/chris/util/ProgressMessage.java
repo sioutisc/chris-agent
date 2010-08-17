@@ -100,7 +100,7 @@ public class ProgressMessage {
     }
     
     public static void messageCHRIS(){
-        System.out.println("[Use CHRIS Framework, Copyright 2002-2010, Christos Sioutis]");
+        System.out.println("[Uses CHRIS Framework, http://code.google.com/p/chris-agent]");
     }
     
     
