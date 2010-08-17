@@ -1,0 +1,70 @@
+/* ********************************************************************* *
+ *                                                                       *
+ *   =============================================================       *
+ *   Copyright 2002-2010,                                                *
+ *   Christos Sioutis <christos.sioutis@gmail.com>                       *
+ *   =============================================================       *
+ *   This software was developed during my PhD studies at:               *
+ *                                                                       *
+ *   Knowledge Based Intelligent Engineering Systems Centre (KES)        *
+ *   School of Electrical and Information Engineering                    *
+ *   University of South Australia                                       *
+ *   =============================================================       *
+ *                                                                       *
+ *   This file is part of CHRIS.                                         *
+ *                                                                       *
+ *   CHRIS is free software: you can redistribute it and/or              *
+ *   modify it under the terms of the GNU Lesser General Public Licence  *
+ *   as published by the Free Software Foundation, either version 3 of   *
+ *   the License, or (at your option) any later version.                 *
+ *                                                                       *
+ *   CHRIS is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ *   GNU Lesser General Public License for more details.                 *
+ *                                                                       *
+ *   You should have received a copy of the GNU Lesser General Public    *
+ *   License along with CHRIS.                                           *
+ *   If not, see <http://www.gnu.org/licenses/>.                         *
+ *                                                                       *
+ * ********************************************************************* */
+
+
+
+/*
+ * Sensation.java
+ *
+ * Created on October 10, 2004, 12:51 AM
+ */
+
+package edu.unisa.chris.action;
+import edu.unisa.chris.orientation.*;
+import edu.unisa.chris.decision.*;
+import edu.unisa.chris.learning.*;
+import java.util.*;
+/**
+ * This beliefset contains objects of the Activation and Information operations that the agent should use
+ * @author  Christos Sioutis
+ */
+public beliefset Actions extends ClosedWorld{
+        #key field Action action;
+        #value field boolean active;
+        #indexed query get(Action action, logical boolean active);
+        #indexed query get(logical Action action, boolean active);
+
+        #function query boolean isActive(Action action){
+            logical boolean active;
+            Cursor c = get(action,active);
+            while(c.next())
+                return active.as_boolean();
+            return false;
+        }
+
+        #function query public Action activeAction(){
+            logical Action action;
+            Cursor c = get(action,true);
+            if(c.next())
+                return (Action) action.as_object();
+            return null;
+        }
+}

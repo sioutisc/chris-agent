@@ -1,0 +1,170 @@
+/* ********************************************************************* *
+ *                                                                       *
+ *   =============================================================       *
+ *   Copyright 2002-2010,                                                *
+ *   Christos Sioutis <christos.sioutis@gmail.com>                       *
+ *   =============================================================       *
+ *   This software was developed during my PhD studies at:               *
+ *                                                                       *
+ *   Knowledge Based Intelligent Engineering Systems Centre (KES)        *
+ *   School of Electrical and Information Engineering                    *
+ *   University of South Australia                                       *
+ *   =============================================================       *
+ *                                                                       *
+ *   This file is part of CHRIS.                                         *
+ *                                                                       *
+ *   CHRIS is free software: you can redistribute it and/or              *
+ *   modify it under the terms of the GNU Lesser General Public Licence  *
+ *   as published by the Free Software Foundation, either version 3 of   *
+ *   the License, or (at your option) any later version.                 *
+ *                                                                       *
+ *   CHRIS is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ *   GNU Lesser General Public License for more details.                 *
+ *                                                                       *
+ *   You should have received a copy of the GNU Lesser General Public    *
+ *   License along with CHRIS.                                           *
+ *   If not, see <http://www.gnu.org/licenses/>.                         *
+ *                                                                       *
+ * ********************************************************************* */
+
+
+
+/*
+ * QLearning.plan
+ *
+ * Created on October 7, 2004, 8:10 PM
+ */
+
+package edu.unisa.chris.learning;
+import edu.unisa.chris.learning.perception.*;
+import edu.unisa.chris.action.*;
+import edu.unisa.chris.orientation.*;
+import edu.unisa.chris.agent.*;
+import aos.jack.util.cursor.Change;
+/**
+ * QLearning Algorithm (A=Action, S=State, R=Reward) 
+ * 1. observe S
+ * 2. repeat(for each step in episode) //episode=while target is active
+ * 3.    choose A from S
+ * 4.    take A observe R,S'
+ * 5.    D = R + GAMMA * argmax(A',Q(S',A')) - Q(S,A)
+ * 6.    Q(S,A) = Q(S,A) + alpha * D
+ * 7.    S = S'
+ * 9. end repeat
+ *
+ * @author  Christos Sioutis
+ */
+public plan QLearning extends Plan {
+    #handles event Learn learn;
+    #posts event SkillControlEvent skillControl;
+    #uses data StateActionValueFunction saValueFunction;
+    #uses data LearningGoals learningGoals;
+    #uses data Actions actions;
+    #uses data CurrentStateInstance currentStateInstance;
+    #uses data Scheduler scheduler;
+
+    #posts event ChooseAction choose;
+    #uses data SelectedAction selectedAction;
+
+    #posts event ActionEvent actionEvent;
+
+    #uses interface CHRISFunctions chris;
+
+    StateInstance state, stateNew;
+    Perception perception, perceptionNew;
+    double value, valueNew, valueNext, reward, delta;
+    Action action;
+    ActionOptions options;
+    ActionValuePair bestNextAction;
+    int targetStatus;
+    double vfChange;
+
+    static boolean relevant(Learn learn){
+        return ( learn.goal.learning == CHRISConstants.LEARNING_ACTIVE &&
+                 learn.goal.algorithm == CHRISConstants.RL_QLEARNING);
+    }
+
+
+    body(){
+        chris.logInfo("CHRIS: Learning: QLEARNING: Entering Algorithm",chris.LOG_LEARNING,true);
+
+        if(scheduler.getActiveTarget()!=null && learn.target.equals(scheduler.getActiveTarget())){
+            chris.logInfo("CHRIS: Learning: QLEARNING: -> Waiting for initial StateInstance",chris.LOG_LEARNING,true);
+            //wait for a stateInstance to be available
+            while(currentStateInstance.getCurrentStateInstance() == null)
+                @wait_for(new Change(currentStateInstance,true));
+
+            chris.logInfo("CHRIS: Learning: QLEARNING: 1. observe S",chris.LOG_LEARNING,true);
+            StateInstance state = currentStateInstance.getCurrentStateInstance();
+            Perception perception = learn.goal.getPerception(state,saValueFunction);
+
+            while(scheduler.getActiveTarget()!=null && learn.target.equals(scheduler.getActiveTarget())){
+                chris.logInfo("CHRIS: Learning: QLEARNING: 2. repeat(for each step in episode)",chris.LOG_LEARNING,true);
+
+                chris.logInfo("CHRIS: Learning: QLEARNING: 3. choose A from S using policy derived from Q",chris.LOG_LEARNING,true);
+                @subtask(choose.choose(learn.goal,state,perception));
+                action = selectedAction.get(learn.goal.name);
+                chris.logInfo("CHRIS: Learning: QLEARNING: -> Action Selected= "+action,chris.LOG_LEARNING,true);
+            
+                chris.logInfo("CHRIS: Learning: QLEARNING: 4. take A observe R,S'",chris.LOG_LEARNING,true);
+                actions.add(learn.goal.getAction(action),true);
+                @post(actionEvent.takeAction(learn.goal.getAction(action)));
+                waitAsRequired();
+
+                stateNew = currentStateInstance.getCurrentStateInstance();
+                perceptionNew = learn.goal.getPerception(stateNew,saValueFunction);
+                reward = learn.goal.rewardFunction(perception, action, perceptionNew);
+                chris.logInfo("CHRIS: Learning: QLEARNING: -> Reward Recieved="+reward,chris.LOG_LEARNING,true);
+
+                chris.logInfo("CHRIS: Learning: QLEARNING: 5. D = R + GAMMA * argmax(A',Q(S',A')) - Q(S,A)",chris.LOG_LEARNING,true);
+                options = saValueFunction.getActionOptions(learn.goal.name,perceptionNew,learn.goal.getActionsAvailable(chris,stateNew,saValueFunction));
+                bestNextAction = options.getFirst();
+                value = saValueFunction.getValue(learn.goal.name,perception,action);
+                valueNext = bestNextAction.value;
+                delta = reward + (learn.goal.discountFactor * valueNext) - value;
+
+                chris.logInfo("CHRIS: Learning: QLEARNING: 6. Q(S,A) = Q(S,A) + alpha * D",chris.LOG_LEARNING,true);                
+                valueNew = value + (learn.goal.stepSizeParameter * delta);
+                saValueFunction.add(learn.goal.name,perception,action, valueNew);
+
+                chris.logInfo("CHRIS: Learning: QLEARNING: 7. S = S'",chris.LOG_LEARNING,true);                
+                state = stateNew;
+                perception = perceptionNew;
+
+                targetStatus = learn.goal.getGoalStatus(state);
+                if(targetStatus == chris.GOAL_FAILED || targetStatus == chris.GOAL_IMPOSSIBLE || targetStatus == chris.GOAL_ACHIEVED)
+                   scheduler.remove(learn.target);
+
+                vfChange += valueNew-value;
+            }
+            if(learn.goal.skillControl == true)
+                @subtask(skillControl.skillControl(learn.goal,vfChange));
+        }
+    }
+
+    #reasoning method waitAsRequired(){
+        if(learn.goal.waitOrderActionState == true){
+            if(learn.goal.waitForActionFinish == true){
+                chris.logInfo("CHRIS: Learning: QLEARNING: -> Waiting for action to be executed",chris.LOG_LEARNING,true);
+                @wait_for(new ActionFinishedCursor(actions,action,false));
+            }
+            if(learn.goal.waitForStateInstanceUpdate == true){
+                chris.logInfo("CHRIS: Learning: QLEARNING: -> Waiting for StateInstance update",chris.LOG_LEARNING,true);
+                @wait_for(new Change(currentStateInstance,false));
+            }
+        }
+        else{
+            if(learn.goal.waitForStateInstanceUpdate == true){
+                chris.logInfo("CHRIS: Learning: QLEARNING: -> Waiting for StateInstance update",chris.LOG_LEARNING,true);
+                @wait_for(new Change(currentStateInstance,false));
+            }
+            if(learn.goal.waitForActionFinish == true){
+                chris.logInfo("CHRIS: Learning: QLEARNING: -> Waiting for action to be executed",chris.LOG_LEARNING,true);
+                @wait_for(new ActionFinishedCursor(actions,action,false));
+            }
+        }
+    }
+
+}

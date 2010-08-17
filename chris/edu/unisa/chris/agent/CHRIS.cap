@@ -1,0 +1,87 @@
+/* ********************************************************************* *
+ *                                                                       *
+ *   =============================================================       *
+ *   Copyright 2002-2010,                                                *
+ *   Christos Sioutis <christos.sioutis@gmail.com>                       *
+ *   =============================================================       *
+ *   This software was developed during my PhD studies at:               *
+ *                                                                       *
+ *   Knowledge Based Intelligent Engineering Systems Centre (KES)        *
+ *   School of Electrical and Information Engineering                    *
+ *   University of South Australia                                       *
+ *   =============================================================       *
+ *                                                                       *
+ *   This file is part of CHRIS.                                         *
+ *                                                                       *
+ *   CHRIS is free software: you can redistribute it and/or              *
+ *   modify it under the terms of the GNU Lesser General Public Licence  *
+ *   as published by the Free Software Foundation, either version 3 of   *
+ *   the License, or (at your option) any later version.                 *
+ *                                                                       *
+ *   CHRIS is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ *   GNU Lesser General Public License for more details.                 *
+ *                                                                       *
+ *   You should have received a copy of the GNU Lesser General Public    *
+ *   License along with CHRIS.                                           *
+ *   If not, see <http://www.gnu.org/licenses/>.                         *
+ *                                                                       *
+ * ********************************************************************* */
+
+
+
+/*
+ * OrientationStage.java
+ *
+ * Created on 24 September 2004, 11:48
+ */
+
+package edu.unisa.chris.agent;
+import edu.unisa.chris.kernel.*;
+import edu.unisa.chris.observation.*;
+import edu.unisa.chris.orientation.*;
+import edu.unisa.chris.decision.*;
+import edu.unisa.chris.action.*;
+import edu.unisa.chris.learning.*;
+
+/**
+ * Orientation Stage is the second stage from the OODA loop
+ * @author  Christos Sioutis
+ */
+public capability CHRIS extends Capability{
+    //OBSERVATION
+    #handles external event Sensation;
+    #has capability ObservationStage observationStage;
+
+    //ORIENTATION
+    #handles external event StateChange;
+    #has capability OrientationStage orientationStage;
+    #imports data CurrentStateInstance currentStateInstance();
+
+    //DECISION
+    #handles external event Goal;
+    #imports data Goals goals();
+    #has capability DecisionStage decisionStage;
+    #posts external event Target;
+
+    //ACTION
+    #imports data Scheduler scheduler();
+    #imports data Actions actions();
+    #has capability ActionStage actionStage;
+
+    //LEARNING
+    #imports data LearningGoals learningGoals();
+    #imports data SelectedAction selectedAction();
+    #imports data StateActionValueFunction saValueFunction();
+    #has capability LearningStage learningStage;
+    #posts external event ActionEvent;
+
+    public void saveLearning(String fileName){
+        learningStage.saValueFunction.write(fileName);
+    }
+
+    public void loadLearning(String fileName){
+        learningStage.saValueFunction.read(fileName);
+    }
+}

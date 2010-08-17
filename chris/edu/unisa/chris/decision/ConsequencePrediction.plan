@@ -1,0 +1,187 @@
+/* ********************************************************************* *
+ *                                                                       *
+ *   =============================================================       *
+ *   Copyright 2002-2010,                                                *
+ *   Christos Sioutis <christos.sioutis@gmail.com>                       *
+ *   =============================================================       *
+ *   This software was developed during my PhD studies at:               *
+ *                                                                       *
+ *   Knowledge Based Intelligent Engineering Systems Centre (KES)        *
+ *   School of Electrical and Information Engineering                    *
+ *   University of South Australia                                       *
+ *   =============================================================       *
+ *                                                                       *
+ *   This file is part of CHRIS.                                         *
+ *                                                                       *
+ *   CHRIS is free software: you can redistribute it and/or              *
+ *   modify it under the terms of the GNU Lesser General Public Licence  *
+ *   as published by the Free Software Foundation, either version 3 of   *
+ *   the License, or (at your option) any later version.                 *
+ *                                                                       *
+ *   CHRIS is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ *   GNU Lesser General Public License for more details.                 *
+ *                                                                       *
+ *   You should have received a copy of the GNU Lesser General Public    *
+ *   License along with CHRIS.                                           *
+ *   If not, see <http://www.gnu.org/licenses/>.                         *
+ *                                                                       *
+ * ********************************************************************* */
+
+
+
+/*
+ * Activation.java
+ *
+ * Created on September 22, 2004, 3:37 PM
+ */
+
+package edu.unisa.chris.decision;
+import java.util.*;
+import edu.unisa.chris.learning.*;
+import edu.unisa.chris.agent.*;
+import edu.unisa.chris.orientation.*;
+import aos.jack.util.cursor.Change;
+import aos.jack.jak.beliefset.BeliefSetException;
+/**
+ * This plan posts Alert events for each of the data objects produced by the Activation class
+ * @author  Christos Sioutis
+ */
+public plan ConsequencePrediction extends Plan{
+        #handles event ExecuteSubGoalsEvent ev;
+        #reads data Goals goals;
+	#uses data GoalChosen goalChosen;
+        #posts event GoalOptions options;
+        #uses interface CHRISFunctions chris;
+        #posts event Goal subGoal;
+        //#uses data CurrentStateInstance goalStateInstance;
+        #uses data StateActionValueFunction saValueFunction;
+        #uses data SelectedAction subGoalSelected;
+
+        GoalsInstance initialInstance;
+        GoalPerception initialPerception, finalPerception;
+        GoalChoice selectedChoice;
+        boolean subGoalSucceeded = false;
+        ActionOptions actionOptions;
+        List choiceList;
+
+        static boolean relevant (ExecuteSubGoalsEvent ev){
+            if(ev.type == CHRISConstants.SUBGOAL_OPTIONAL)
+                return true;
+            return false;
+        }
+
+	body(){
+            chris.logInfo("CHRIS: Decision: ConsequencePrediction: For "+ev.goal,chris.LOG_DECISION,true);
+            choiceList = goals.getOptionalGoalChoices(ev.goal);
+            actionOptions = saValueFunction.getActionOptions(ev.goal,initialPerception,choiceList);
+
+            while(subGoalSucceeded == false && actionOptions.size() > 0){
+                initialInstance = (GoalsInstance) goals.getInstance();
+                initialPerception = new GoalPerception(initialInstance,ev.goal);
+
+                @post(options.goalOptions(ev.goal,ev.parent,actionOptions.getAll(),initialInstance));   
+
+                //wait to find out which subgoal was selected
+                while(selectedChoice == null){
+                    @wait_for(new Change(subGoalSelected,false));
+                    selectedChoice = (GoalChoice) subGoalSelected.getAndRemove(ev.goal); //getAndRemove releases EvaluateOptions to continue by execuring the goal
+                }
+
+                //this is to make sure the goal is activated before going to the next line
+                //sometimes other activities update Goals (twice) before the subGoal is actually activated
+                //hence causing the following statement to continue and the subGoal being subsequently activated
+                @wait_for(new GoalActiveCursor(goals,selectedChoice.action,ev.goal,false));
+                //wait for the selected goal to finish
+                @wait_for(new GoalFinishedCursor(goals,selectedChoice.action,ev.goal,false));
+
+                updateValueFunction();
+
+                if(subGoalSucceeded(selectedChoice.action,ev.goal))
+                   subGoalSucceeded = true;
+                else
+                    actionOptions.remove(selectedChoice.action);
+
+                selectedChoice = null;
+            }
+
+            if(actionOptions.size() == 0){
+                //all goals have failed, forcing a fail
+                @maintain(new OptionalExecutionCursor(goals,actionOptions,true),options.goalOptions(ev.goal,ev.parent,actionOptions.getAll(),initialInstance));
+            }
+
+            chris.logInfo("CHRIS: Decision: ConsequencePrediction: Finished "+ev.goal,chris.LOG_DECISION,true);
+
+	}
+
+        public boolean subGoalSucceeded(String goal, String parent){
+            try{
+                GoalInfo before = initialInstance.getGoalInfo(goal,parent);
+                GoalInfo after = (GoalInfo) goals.getGoalInfo(goal,parent);
+                if(after.successCount > before.successCount)
+                    return true;
+            }
+            catch(Exception e){
+                e.printStackTrace();
+            }
+            return false;
+        }
+
+        public GoalChoice removeChoice(String actionOption){
+            GoalChoice tmp;
+            for(int i=0; i<choiceList.size(); i++){
+                tmp = (GoalChoice) choiceList.get(i);
+                if(actionOption.equals(tmp.action))
+                    return (GoalChoice) choiceList.remove(i);
+            }
+            return null;
+        }
+
+        public void updateValueFunction(){
+            try{
+                chris.logInfo("CHRIS: Decision: ConsequencePrediction: Updating valueFunction for: "+selectedChoice,chris.LOG_DECISION,true);
+                GoalsInstance finalInstance = (GoalsInstance) goals.getInstance();
+                finalPerception = new GoalPerception(finalInstance,ev.goal);
+                List choiceList = goals.getOptionalGoalChoices(ev.goal);
+                ActionOptions actionOptions = saValueFunction.getActionOptions(ev.goal,finalPerception,choiceList);
+                ActionValuePair bestChoice = actionOptions.getFirst();
+
+                double valueSA = saValueFunction.getValue(ev.goal,initialPerception,selectedChoice);
+
+                //D = R + GAMMA * argmax(A',Q(S',A')) - Q(S,A)
+                double reward = rewardFunction(); 
+                chris.logInfo("CHRIS: Decision: ConsequencePrediction: Reward Recieved="+reward,chris.LOG_DECISION,true);
+                double delta = reward + (goals.discountFactor * bestChoice.value) - valueSA;
+
+                //Q(S,A) = Q(S,A) + alpha * D
+                double valueNewSA = valueSA + (goals.stepSizeParameter * delta);
+                saValueFunction.add(ev.goal,initialPerception,selectedChoice,valueNewSA);
+            }
+            catch(Exception e){
+                e.printStackTrace();
+            }
+        }
+
+        public double rewardFunction(){
+            double reward = 0.0;
+            try{
+                GoalInfo before, after;
+                for(int i=0; i<initialInstance.goals.size(); i++){
+                    before = (GoalInfo) initialInstance.goals.get(i);
+                    after = goals.getGoalInfo(before.name,before.parent);
+                    reward += 1.0 * (after.successCount-before.successCount) * before.priority;
+                    reward += -1.0 * (after.failureCount-before.failureCount) * before.priority;
+                }
+            }
+            catch(Exception e){
+                e.printStackTrace();
+            }
+            return reward;
+        }
+
+        #reasoning method fail(){
+            chris.logInfo("CHRIS: Decision: ConsequencePrediction: Failed "+ev.goal,chris.LOG_DECISION,true);
+        }
+
+}

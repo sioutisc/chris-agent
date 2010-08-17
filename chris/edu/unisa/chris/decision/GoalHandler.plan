@@ -1,0 +1,113 @@
+/* ********************************************************************* *
+ *                                                                       *
+ *   =============================================================       *
+ *   Copyright 2002-2010,                                                *
+ *   Christos Sioutis <christos.sioutis@gmail.com>                       *
+ *   =============================================================       *
+ *   This software was developed during my PhD studies at:               *
+ *                                                                       *
+ *   Knowledge Based Intelligent Engineering Systems Centre (KES)        *
+ *   School of Electrical and Information Engineering                    *
+ *   University of South Australia                                       *
+ *   =============================================================       *
+ *                                                                       *
+ *   This file is part of CHRIS.                                         *
+ *                                                                       *
+ *   CHRIS is free software: you can redistribute it and/or              *
+ *   modify it under the terms of the GNU Lesser General Public Licence  *
+ *   as published by the Free Software Foundation, either version 3 of   *
+ *   the License, or (at your option) any later version.                 *
+ *                                                                       *
+ *   CHRIS is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ *   GNU Lesser General Public License for more details.                 *
+ *                                                                       *
+ *   You should have received a copy of the GNU Lesser General Public    *
+ *   License along with CHRIS.                                           *
+ *   If not, see <http://www.gnu.org/licenses/>.                         *
+ *                                                                       *
+ * ********************************************************************* */
+
+
+
+/*
+ * Activation.java
+ *
+ * Created on September 22, 2004, 3:37 PM
+ */
+
+package edu.unisa.chris.decision;
+import java.util.*;
+import edu.unisa.chris.kernel.*;
+import edu.unisa.chris.agent.*;
+import edu.unisa.chris.orientation.*;
+import aos.jack.util.cursor.Change;
+import edu.unisa.chris.agent.*;
+/**
+ * This plan posts Alert events for each of the data objects produced by the Activation class1
+ * @author  Christos Sioutis
+ */
+public plan GoalHandler extends Plan{
+        #handles event Goal goal;
+        #uses data Goals goals;
+        #uses interface CHRISFunctions chris;
+
+        #posts event ExecuteSubGoalsEvent subGoals;
+
+        logical String name;
+        logical int type;
+        logical int priority;
+        logical int successCount;
+        logical int failureCount;
+        logical int proceduralIndex;
+        context(){
+            goals.get(name,goal.name,type,false,priority,successCount,failureCount,proceduralIndex);
+        }
+
+
+	body(){
+            try{
+                @sleep(0.001); //added to ensure that any plans that posted this goal have time to wait for it to activate
+
+                //update the Goals beliefset to indicate that this goal is now active
+                GoalInfo info = goals.getGoalInfo(goal.name,goal.parent);
+                goals.add(info.name,info.parent,info.type,true,info.priority,info.successCount,info.failureCount,info.proceduralIndex);
+                chris.logInfo("CHRIS: Decision: GoalHandler: Goal Activated: "+goal.name,chris.LOG_DECISION,true);
+
+                //execute resident subgoals first, these goals have no effect on the outcome of this goal
+                if(goals.hasSubGoals(goal.name,chris.SUBGOAL_RESIDENT)){
+                    @subtask(subGoals.execute(goal.name,goal.parent,chris.SUBGOAL_RESIDENT));
+                }
+                else if(goals.hasSubGoals(goal.name,chris.SUBGOAL_PROCEDURAL)){
+                    @subtask(subGoals.execute(goal.name,goal.parent,chris.SUBGOAL_PROCEDURAL));
+                }
+                else if(goals.hasSubGoals(goal.name,chris.SUBGOAL_PARALLEL)){
+                    @subtask(subGoals.execute(goal.name,goal.parent,chris.SUBGOAL_PARALLEL));
+                }
+                else if(goals.hasSubGoals(goal.name,chris.SUBGOAL_EITHER)){
+                    @subtask(subGoals.execute(goal.name,goal.parent,chris.SUBGOAL_EITHER));
+                }
+                else if(goals.hasSubGoals(goal.name,chris.SUBGOAL_OPTIONAL)){
+                    @subtask(subGoals.execute(goal.name,goal.parent,chris.SUBGOAL_OPTIONAL));
+                }
+                else if(goals.hasSubGoals(goal.name,chris.SUBGOAL_IFELSE)){
+                    @subtask(subGoals.execute(goal.name,goal.parent,chris.SUBGOAL_IFELSE));
+                }
+                chris.logInfo("CHRIS: Decision: GoalHandler: Goal Succeeded: "+goal.name,chris.LOG_DECISION,true);
+                goals.add(info.name,info.parent,info.type,false,info.priority,info.successCount+1,info.failureCount,info.proceduralIndex);
+            }
+            catch (MaintenanceViolation e){
+                chris.logInfo("CHRIS: Decision: GoalHandler: Maintainance Violation, Goal Finished: "+goal.name,chris.LOG_DECISION,true);
+                GoalInfo info = goals.getGoalInfo(goal.name,goal.parent);
+                goals.add(info.name,info.parent,info.type,false,info.priority,info.successCount,info.failureCount,info.proceduralIndex);
+                throw e;
+            }            
+	}
+
+        #reasoning method fail(){
+            GoalInfo info = goals.getGoalInfo(goal.name,goal.parent);
+            goals.add(info.name,info.parent,info.type,false,info.priority,info.successCount,info.failureCount+1,info.proceduralIndex);
+            chris.logInfo("CHRIS: Decision: GoalHandler: Goal Failed: "+goal.name,chris.LOG_DECISION,true);
+        }
+}

@@ -1,0 +1,80 @@
+/* ********************************************************************* *
+ *                                                                       *
+ *   =============================================================       *
+ *   Copyright 2002-2010,                                                *
+ *   Christos Sioutis <christos.sioutis@gmail.com>                       *
+ *   =============================================================       *
+ *   This software was developed during my PhD studies at:               *
+ *                                                                       *
+ *   Knowledge Based Intelligent Engineering Systems Centre (KES)        *
+ *   School of Electrical and Information Engineering                    *
+ *   University of South Australia                                       *
+ *   =============================================================       *
+ *                                                                       *
+ *   This file is part of CHRIS.                                         *
+ *                                                                       *
+ *   CHRIS is free software: you can redistribute it and/or              *
+ *   modify it under the terms of the GNU Lesser General Public Licence  *
+ *   as published by the Free Software Foundation, either version 3 of   *
+ *   the License, or (at your option) any later version.                 *
+ *                                                                       *
+ *   CHRIS is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ *   GNU Lesser General Public License for more details.                 *
+ *                                                                       *
+ *   You should have received a copy of the GNU Lesser General Public    *
+ *   License along with CHRIS.                                           *
+ *   If not, see <http://www.gnu.org/licenses/>.                         *
+ *                                                                       *
+ * ********************************************************************* */
+
+
+
+Cognitive Hybrid Reasoning Intelligent agent System - CHRIS
+=============================================================
+Release Notes
+=============================================================
+chris-0-7-220305
+Fixed sluggish passive learning performance
+--------------------------------------------------------
+chris-0-6-220305
+Added multi-stateinstance action support using the Actions beliefset
+Actions now need to specify when they start and finish by adding a TRUE/FALSE
+to indicate if they are active to the Actions beliefset (see Bandit.agent for example)
+
+Next: Clean any files that are not required from the release
+Add copyright and other comments in all files
+--------------------------------------------------------
+chris-0-5-220305
+Fixed behaviour of Optional in decision stage, it now keeps activating options until one passes or they all fail, hope this is what i want
+added Actions beliefset to Action stage this is in preparation of fixing the learning algorithms so that they
+correctly wait for an action to finish. They currently only wait for the next stateInstance, there may be actions however that 
+get multiple state updates before they complete.
+--------------------------------------------------------
+chris-0-4-210305
+Decision stage complete.
+Consequence and usefulness dropped infavour of a universal reward
+Next step is to clean up events in DecisionStage
+--------------------------------------------------------
+chris-0-4-190305
+Decision stage mostly complete and tested using Survivor agent
+Procedural, Parallel, Resident, Either are all working correctly
+Next step is to get Optional working, this needs a change in the currentStateInstance which must
+be propagated in learningGoals and learning algorithms
+--------------------------------------------------------
+chris-0-3-150305
+SkillControl complete
+VFChange is currently based on a per-step basis, however in my notes I use a per-episode basis where the episode
+change is the sum of all step changes. In that situation I would only update SkillControl at the end of an episode
+and it would take effect if/when that learning goal is activated again.
+--------------------------------------------------------
+chris-0-2-130305
+QLearning and SoftMax are completed.
+Added getGoalStatus method in LearningGoal to allow a learning process to be stopped when an episode is complete.
+--------------------------------------------------------
+chris-0-1-080305
+General structure of CHRIS is complete, SARSA/EGREEDY algorithms are tested with BANDIT and display limited working functionality.
+Need to add working QLearning and Softmax.
+At this stage BANDIT learns within an infinite loop and needs to be manually killed. Need to fix this such that it automatically stops after a predetermined number of iterations, say 2000 as per textbook.
+--------------------------------------------------------
