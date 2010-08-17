@@ -1,0 +1,113 @@
+/* ********************************************************************* *
+ *                                                                       *
+ *   =============================================================       *
+ *   Copyright 2002-2010,                                                *
+ *   Christos Sioutis <christos.sioutis@gmail.com>                       *
+ *   =============================================================       *
+ *   This software was developed during my PhD studies at:               *
+ *                                                                       *
+ *   Knowledge Based Intelligent Engineering Systems Centre (KES)        *
+ *   School of Electrical and Information Engineering                    *
+ *   University of South Australia                                       *
+ *   =============================================================       *
+ *                                                                       *
+ *   This file is part of CHRIS.                                         *
+ *                                                                       *
+ *   CHRIS is free software: you can redistribute it and/or              *
+ *   modify it under the terms of the GNU Lesser General Public Licence  *
+ *   as published by the Free Software Foundation, either version 3 of   *
+ *   the License, or (at your option) any later version.                 *
+ *                                                                       *
+ *   CHRIS is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ *   GNU Lesser General Public License for more details.                 *
+ *                                                                       *
+ *   You should have received a copy of the GNU Lesser General Public    *
+ *   License along with CHRIS.                                           *
+ *   If not, see <http://www.gnu.org/licenses/>.                         *
+ *                                                                       *
+ * ********************************************************************* */
+
+
+
+/*
+ * Sensation.java
+ *
+ * Created on October 10, 2004, 12:51 AM
+ */
+
+package edu.unisa.chris.learning;
+import edu.unisa.chris.action.*;
+import edu.unisa.chris.decision.*;
+import edu.unisa.chris.learning.*;
+import edu.unisa.chris.learning.perception.*;
+import java.util.*;
+/**
+ * This beliefset contains objects of the Activation and Information operations that the agent should use
+ * @author  Christos Sioutis
+ */
+public beliefset StateActionValueFunction extends ClosedWorld{
+        #key field String learningGoal;
+        #key field Perception state;
+	#key field Action action;
+        #value field double value;
+        #indexed query get(String learningGoal, Perception state, Action action, logical double value);
+        #indexed query get(String learningGoal, Perception state, logical Action action, logical double value);
+        #indexed query get(String learningGoal, logical Perception state, logical Action action, logical double value);
+
+        /** Returns tuples containing the state including the perception itself, this is useful for generalisation */
+        #complex query get(String learningGoal, Perception state, logical Perception perception){
+            logical Action action;
+            logical double value;
+            return get(learningGoal,perception,action,value) && get(learningGoal,state,action,value);
+        }
+
+        #function query public Perception getPerception(String learningGoal, Perception state){
+            logical Perception perception;
+            logical Action action;
+            logical double value;
+            Cursor c = get(learningGoal,perception,action,value);
+            while(c.next()){
+                if(perception.as_object().equals(state))
+                    return (Perception) perception.as_object();
+            }
+            return null;
+        }
+
+        #function query public double getValue(String learningGoal, Perception state, Action action){
+            logical double value;
+            Cursor c = get(learningGoal, state,action,value);
+            if(c.next())
+                return value.as_double();
+            return 0.0;
+        }
+
+        #function query public ActionOptions getActionOptions(String learningGoal, Perception state, List availableActions){
+            ActionOptions options = new ActionOptions();
+            Action tmp;
+            double value;
+            for(int i=0; i<availableActions.size(); i++){
+                tmp = (Action) availableActions.get(i);
+                options.add(new ActionValuePair(tmp,getValue(learningGoal,state,tmp)));
+            }
+            return options;
+        }
+
+        #function query public ActionValuePair getBestAction(String learningGoal, Perception state, List availableActions){
+            Action action;
+            int bestIndex;
+            double bestValue, value;
+
+            for(int i=0; i<availableActions.size(); i++){
+                action = (Action) availableActions.get(i);
+                value = getValue(learningGoal,state,action);
+                if(value>=bestValue){
+                    bestIndex = i;
+                    bestValue = value;
+                }
+            }
+            return new ActionValuePair((Action)availableActions.get(bestIndex),bestValue);
+        }
+
+}

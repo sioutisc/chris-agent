@@ -1,0 +1,283 @@
+/* ********************************************************************* *
+ *                                                                       *
+ *   =============================================================       *
+ *   Copyright 2002-2010,                                                *
+ *   Christos Sioutis <christos.sioutis@gmail.com>                       *
+ *   =============================================================       *
+ *   This software was developed during my PhD studies at:               *
+ *                                                                       *
+ *   Knowledge Based Intelligent Engineering Systems Centre (KES)        *
+ *   School of Electrical and Information Engineering                    *
+ *   University of South Australia                                       *
+ *   =============================================================       *
+ *                                                                       *
+ *   This file is part of CHRIS.                                         *
+ *                                                                       *
+ *   CHRIS is free software: you can redistribute it and/or              *
+ *   modify it under the terms of the GNU Lesser General Public Licence  *
+ *   as published by the Free Software Foundation, either version 3 of   *
+ *   the License, or (at your option) any later version.                 *
+ *                                                                       *
+ *   CHRIS is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ *   GNU Lesser General Public License for more details.                 *
+ *                                                                       *
+ *   You should have received a copy of the GNU Lesser General Public    *
+ *   License along with CHRIS.                                           *
+ *   If not, see <http://www.gnu.org/licenses/>.                         *
+ *                                                                       *
+ * ********************************************************************* */
+
+
+
+/*
+ * Sensation.java
+ *
+ * Created on October 10, 2004, 12:51 AM
+ */
+
+package edu.unisa.chris.decision;
+import edu.unisa.chris.orientation.*;
+import edu.unisa.chris.agent.*;
+import edu.unisa.chris.learning.perception.*;
+import java.util.*;
+/**
+ * This beliefset contains objects of the Activation and Information operations that the agent should use
+ * @author  Christos Sioutis
+ */
+public beliefset Goals extends ClosedWorld implements State{
+	#key field String name;
+        #key field String parent;
+        #value field int type; //0=procedural, 1=parallel, 2=optional, 3=resident
+	#value field boolean active;
+	#value field int priority;
+        #value field int successCount;
+        #value field int failureCount;
+        #value field int proceduralIndex;
+	#indexed query get(String name, logical String parent, logical int type, logical boolean active, logical int priority, logical int successCount, logical int failureCount, logical int proceduralIndex);
+	#indexed query get(String name, String parent, logical int type, logical boolean active, logical int priority, logical int successCount, logical int failureCount, logical int proceduralIndex);	
+	#indexed query get(logical String name, String parent, logical int type, logical boolean active, logical int priority, logical int successCount, logical int failureCount, logical int proceduralIndex);
+	#indexed query get(logical String name, logical String parent, logical int type, boolean active, logical int priority, logical int successCount, logical int failureCount, logical int proceduralIndex);
+	#indexed query get(logical String name, logical String parent, logical int type, logical boolean active, int priority, logical int successCount, logical int failureCount, logical int proceduralIndex);
+	#indexed query get(logical String name, String parent, logical int type, boolean active, logical int priority, logical int successCount, logical int failureCount, logical int proceduralIndex);
+	#indexed query get(logical String name, String parent, int type, boolean active, logical int priority, logical int successCount, logical int failureCount, logical int proceduralIndex);
+	#indexed query get(logical String name, String parent, int type, logical boolean active, logical int priority, logical int successCount, logical int failureCount, logical int proceduralIndex);
+	#indexed query get(logical String name, logical String parent, logical int type, logical boolean active, logical int priority, logical int successCount, logical int failureCount, logical int proceduralIndex);
+
+        #function query public List getSubGoals(String parentGoal, int type){
+            logical String name;
+            logical boolean active;
+            logical int priority;
+            logical int successCount;
+            logical int failureCount;
+            logical int proceduralIndex;
+            List list = new LinkedList();
+            Cursor c = get(name,parentGoal,type,active,priority,successCount,failureCount,proceduralIndex);
+            while(c.next()){
+                addProceduralIndexSorted(list,new GoalInfo(name.as_string(),parentGoal,type,active.as_boolean(),priority.as_int(),successCount.as_int(),failureCount.as_int(),proceduralIndex.as_int()));
+            }
+            return list;
+        }
+
+        #function query public List getSubGoals(String parentGoal, int type, boolean active){
+            logical String name;
+            logical int priority;
+            logical int successCount;
+            logical int failureCount;
+            logical int proceduralIndex;
+            List list = new LinkedList();
+            Cursor c = get(name,parentGoal,type,active,priority,successCount,failureCount,proceduralIndex);
+            while(c.next()){
+                addProceduralIndexSorted(list,new GoalInfo(name.as_string(),parentGoal,type,active,priority.as_int(),successCount.as_int(),failureCount.as_int(),proceduralIndex.as_int()));
+            }
+            return list;
+        }
+
+        #function query public List getParent(String goal){
+            logical String parent;
+            logical int type;
+            logical boolean active;
+            logical int priority;
+            logical int successCount;
+            logical int failureCount;
+            logical int proceduralIndex;
+            List list = new LinkedList();
+            Cursor c = get(goal,parent,type,active,priority,successCount,failureCount,proceduralIndex);
+            while(c.next()){
+                list.add(parent.as_string());
+            }
+            return list;
+        }
+
+
+        #function query public List getOptionalGoalChoices(String parentGoal){
+            logical String name;
+            logical boolean active;
+            logical int priority;
+            logical int successCount;
+            logical int failureCount;
+            logical int proceduralIndex;
+            List list = new LinkedList();
+            Cursor c = get(name,parentGoal,CHRISConstants.SUBGOAL_OPTIONAL,active,priority,successCount,failureCount,proceduralIndex);
+            while(c.next()){
+                list.add(new GoalChoice(name.as_string(),parentGoal));
+            }
+            return list;
+        }
+
+        #function query public boolean hasSubGoals(String parent, int type){
+            logical String name;
+            logical boolean active;
+            logical int priority;
+            logical int successCount;
+            logical int failureCount;
+            logical int proceduralIndex;
+            Cursor c = get(name,parent,type,active,priority,successCount,failureCount,proceduralIndex);
+            if(c.next())
+                return true;
+            return false;
+        }
+
+        #function query public boolean hasSubGoals(String parent){
+            logical String name;
+            logical int type;
+            logical boolean active;
+            logical int priority;
+            logical int successCount;
+            logical int failureCount;
+            logical int proceduralIndex;
+            Cursor c = get(name,parent,type,active,priority,successCount,failureCount,proceduralIndex);
+            if(c.next())
+                return true;
+            return false;
+        }
+
+        #function query public int getPriority(String name, String parent){
+            logical int type;
+            logical boolean active;
+            logical int priority;
+            logical int successCount;
+            logical int failureCount;
+            logical int proceduralIndex;
+            Cursor c = get(name,parent,type,active,priority,successCount,failureCount,proceduralIndex);
+            if(c.next())
+                return priority.as_int();
+            return -1;
+        }
+
+
+        #function query public List activeGoals(){
+            List list = new LinkedList();
+            logical String name;
+            logical String parent;
+            logical int type;
+            logical int priority;
+            logical int successCount;
+            logical int failureCount;
+            logical int proceduralIndex;
+            Cursor c = get(name,parent,type,true,priority,successCount,failureCount,proceduralIndex);
+            while(c.next())
+                addProceduralIndexSorted(list,new GoalInfo(name.as_string(),parent.as_string(),type.as_int(),true,priority.as_int(),successCount.as_int(),failureCount.as_int(),proceduralIndex.as_int()));
+            return list;
+        }
+
+        #function query public List allGoals(){
+            List list = new LinkedList();
+            logical String name;
+            logical String parent;
+            logical int type;
+            logical boolean active;
+            logical int priority;
+            logical int successCount;
+            logical int failureCount;
+            logical int proceduralIndex;
+            Cursor c = get(name,parent,type,active,priority,successCount,failureCount,proceduralIndex);
+            while(c.next())
+                addProceduralIndexSorted(list,new GoalInfo(name.as_string(),parent.as_string(),type.as_int(),active.as_boolean(),priority.as_int(),successCount.as_int(),failureCount.as_int(),proceduralIndex.as_int()));
+            return list;
+        }
+
+        #function query public boolean isActive(String goalName,String goalParent){
+            logical int type;
+            logical boolean active;
+            logical int priority;
+            logical int successCount;
+            logical int failureCount;
+            logical int proceduralIndex;
+            Cursor c = get(goalName,goalParent,type,active,priority,successCount,failureCount,proceduralIndex);
+            if(c.next())
+                return active.as_boolean();
+            return false;
+        }
+
+        #function query public boolean hasActiveSubGoal(String parent){
+            logical String name;
+            logical int type;
+            logical boolean active;
+            logical int priority;
+            logical int successCount;
+            logical int failureCount;
+            logical int proceduralIndex;
+            Cursor c = get(name,parent,type,active,priority,successCount,failureCount,proceduralIndex);
+            boolean status = false;
+            while(status == false && c.next()){
+                if(active.as_boolean() == true)
+                    status = true;
+            }
+            return status;
+        }
+
+        #function query public GoalInfo getGoalInfo(String goalName, String goalParent){
+            logical int type;
+            logical boolean active;
+            logical int priority;
+            logical int successCount;
+            logical int failureCount;
+            logical int proceduralIndex;
+            Cursor c = get(goalName,goalParent,type,active,priority,successCount,failureCount,proceduralIndex);
+            if(c.next()){
+                return new GoalInfo(goalName,goalParent,type.as_int(),active.as_boolean(),
+                                    priority.as_int(),successCount.as_int(),failureCount.as_int(),proceduralIndex.as_int());
+            }
+            return null;
+        }
+
+        public void addProceduralIndexSorted(List list, GoalInfo info){
+            int i=0;
+            if(list.size() == 0)
+                list.add(info);
+            else{
+                while(i<list.size() && info.proceduralIndex > ((GoalInfo)list.get(i)).proceduralIndex)
+                    i++;            
+                list.add(i,info);
+            }
+        }
+
+        public StateInstance getInstance(){
+            try{
+                List allGoals = allGoals();
+                return new GoalsInstance(allGoals);
+            }
+            catch(Exception e){
+                e.printStackTrace();
+            }
+            return null;
+        }
+
+        /*public void moddb(){
+            stateChange();
+        }*/
+
+        #posts event StateChange ev;
+        public void stateChange(){
+            postEvent(ev.stateChange(getInstance()));
+        }
+
+        //added for defining parameters for learning optional subgoals
+        public double equiprobability = 1; //temperature
+        public double stepSizeParameter = 0.1; //alpha
+        public double discountFactor = 0.9; //gamma
+        public double exploration = 0.1;
+        public int policy = CHRISConstants.POLICY_EGREEDY;
+}

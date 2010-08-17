@@ -1,0 +1,127 @@
+/* ********************************************************************* *
+ *                                                                       *
+ *   =============================================================       *
+ *   Copyright 2002-2010,                                                *
+ *   Christos Sioutis <christos.sioutis@gmail.com>                       *
+ *   =============================================================       *
+ *   This software was developed during my PhD studies at:               *
+ *                                                                       *
+ *   Knowledge Based Intelligent Engineering Systems Centre (KES)        *
+ *   School of Electrical and Information Engineering                    *
+ *   University of South Australia                                       *
+ *   =============================================================       *
+ *                                                                       *
+ *   This file is part of CHRIS.                                         *
+ *                                                                       *
+ *   CHRIS is free software: you can redistribute it and/or              *
+ *   modify it under the terms of the GNU Lesser General Public Licence  *
+ *   as published by the Free Software Foundation, either version 3 of   *
+ *   the License, or (at your option) any later version.                 *
+ *                                                                       *
+ *   CHRIS is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ *   GNU Lesser General Public License for more details.                 *
+ *                                                                       *
+ *   You should have received a copy of the GNU Lesser General Public    *
+ *   License along with CHRIS.                                           *
+ *   If not, see <http://www.gnu.org/licenses/>.                         *
+ *                                                                       *
+ * ********************************************************************* */
+
+
+
+/*
+ * QLearning.java
+ *
+ * Created on October 7, 2004, 8:10 PM
+ */
+
+package edu.unisa.chris.learning;
+import edu.unisa.chris.learning.perception.*;
+import edu.unisa.chris.action.*;
+import edu.unisa.chris.agent.*;
+import edu.unisa.chris.orientation.*;
+import java.util.List;
+/**
+ *
+ * @author  Christos Sioutis
+ */
+public plan SoftMax extends Plan {
+    #handles event ChooseAction choose;
+    //#reads data ActionsAvailable actionsAvailable;
+    #uses data SelectedAction selectedAction;
+    #uses interface CHRISFunctions chris;
+    #uses data StateActionValueFunction saValueFunction;
+    //#uses data CurrentStateInstance currentStateInstance;
+    //#uses data SkillControl skill;
+    ActionOptions options;
+    double probability[];
+
+    static boolean relevant(ChooseAction choose){
+        return ( choose.goal.learning == CHRISConstants.LEARNING_ACTIVE &&
+                 choose.goal.policy == CHRISConstants.POLICY_SOFTMAX);
+    }
+
+    body(){
+        chris.logInfo("CHRIS: Learning: SoftMax: Entering Action Selection (equiprobability="+choose.goal.equiprobability+")",chris.LOG_LEARNING,true);
+        ActionValuePair pair = null;
+        List actions = choose.goal.getActionsAvailable(chris,choose.state,saValueFunction);
+        chris.logInfo("CHRIS: Learning: SoftMax: Number of Actions = "+actions.size(),chris.LOG_LEARNING,true);
+        options = saValueFunction.getActionOptions(choose.goal.name,choose.perception,actions);
+        chris.logInfo("CHRIS: Learning: SoftMax: Number of Action Options = "+options.size(),chris.LOG_LEARNING,true);
+        chris.logInfo("*** CHRIS: Learning: SoftMax: ***"+options,chris.LOG_LEARNING,true);
+
+        probability = new double[options.size()];
+        double random = chris.uniformDouble();
+        double range = 0.0;
+
+        for(int i=0; i<options.size(); i++){
+            probability[i] = actionValue(i);
+        }
+
+        logProbabilityArray();
+
+        for(int i=0; pair == null && i<options.size(); i++)
+        {
+            range += probability[i];
+            if(random < range)
+                pair = options.get(i);
+        }
+        if(pair==null)
+            pair = options.get(options.size()-1);
+
+        selectedAction.add(choose.goal.name,pair.action);
+    }
+
+    //equiprobability=temperature in Gibbs distribution formula
+    private double actionValue(int action)
+    {
+        ActionValuePair pair = (ActionValuePair)options.get(action);
+        double numerator = Math.exp(pair.value / choose.goal.equiprobability);
+        double denominator = actionSum();
+        return( numerator / denominator);
+
+    }
+    
+    private double actionSum()
+    {
+        ActionValuePair pair;
+        double sum = 0.0;
+        for(int i=0; i<options.size(); i++){
+            pair = (ActionValuePair)options.get(i);
+            sum += Math.exp(pair.value / choose.goal.equiprobability);
+         }
+        return sum;
+    }
+
+    public void logProbabilityArray(){
+        StringBuffer sb = new StringBuffer();
+        sb.append(System.getProperty("line.separator")+"*** Probability Array ***");
+        for(int i=0; i<probability.length; i++){
+            sb.append(System.getProperty("line.separator")+"* "+i+". "+probability[i]);
+        }
+        sb.append(System.getProperty("line.separator")+"*********************");
+        chris.logInfo(sb.toString(),chris.LOG_LEARNING,true);
+    }
+}

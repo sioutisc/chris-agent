@@ -1,0 +1,79 @@
+/* ********************************************************************* *
+ *                                                                       *
+ *   =============================================================       *
+ *   Copyright 2002-2010,                                                *
+ *   Christos Sioutis <christos.sioutis@gmail.com>                       *
+ *   =============================================================       *
+ *   This software was developed during my PhD studies at:               *
+ *                                                                       *
+ *   Knowledge Based Intelligent Engineering Systems Centre (KES)        *
+ *   School of Electrical and Information Engineering                    *
+ *   University of South Australia                                       *
+ *   =============================================================       *
+ *                                                                       *
+ *   This file is part of CHRIS.                                         *
+ *                                                                       *
+ *   CHRIS is free software: you can redistribute it and/or              *
+ *   modify it under the terms of the GNU Lesser General Public Licence  *
+ *   as published by the Free Software Foundation, either version 3 of   *
+ *   the License, or (at your option) any later version.                 *
+ *                                                                       *
+ *   CHRIS is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ *   GNU Lesser General Public License for more details.                 *
+ *                                                                       *
+ *   You should have received a copy of the GNU Lesser General Public    *
+ *   License along with CHRIS.                                           *
+ *   If not, see <http://www.gnu.org/licenses/>.                         *
+ *                                                                       *
+ * ********************************************************************* */
+
+
+
+/*
+ * Activation.java
+ *
+ * Created on September 22, 2004, 3:37 PM
+ */
+
+package edu.unisa.chris.decision;
+import java.util.*;
+import edu.unisa.chris.kernel.*;
+import edu.unisa.chris.agent.*;
+import edu.unisa.chris.orientation.*;
+import aos.jack.util.cursor.Change;
+/**
+ * This plan posts Alert events for each of the data objects produced by the Activation class
+ * @author  Christos Sioutis
+ */
+public plan ExecuteParallelSubGoalsPlan extends Plan{
+        #handles event ExecuteSubGoalsEvent ev;
+        #posts event ExecuteSubGoalPostingEvent posting;
+        #uses data Goals goals;
+        #uses interface CHRISFunctions chris;
+        public List initial;
+
+       static boolean relevant (ExecuteSubGoalsEvent ev){
+            if(ev.type == CHRISConstants.SUBGOAL_PARALLEL)
+                return true;
+            return false;
+       }    
+
+	body(){
+            chris.logInfo("CHRIS: Decision: ExecuteParallelSubGoalsPlan: For "+ev.goal,chris.LOG_DECISION,true);
+            initial = goals.getSubGoals(ev.goal,chris.SUBGOAL_PARALLEL);
+            //the below line will fail if any of the subgoals fail
+            @maintain(new ParallelExecutionCursor(goals,ev.parent,initial,true),posting.posting(ev.goal,ev.parent,initial,CHRISConstants.SUBGOAL_PARALLEL));       
+            chris.logInfo("CHRIS: Decision: ExecuteParallelSubGoalsPlan: Successful: "+ev.goal,chris.LOG_DECISION,true);
+	}
+
+        #reasoning method fail(){
+            chris.logInfo("CHRIS: Decision: ExecuteParallelSubGoalsPlan: Failed: "+ev.goal,chris.LOG_DECISION,true);
+            List current = goals.getSubGoals(ev.goal,chris.SUBGOAL_PARALLEL);
+            for(int i=0; i<current.size(); i++){
+                GoalInfo info = (GoalInfo) current.get(i);
+                goals.add(info.name,info.parent,info.type,false,info.priority,info.successCount,info.failureCount,info.proceduralIndex);
+            }
+        }
+}

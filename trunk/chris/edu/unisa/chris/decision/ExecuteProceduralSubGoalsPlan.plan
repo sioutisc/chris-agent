@@ -1,0 +1,77 @@
+/* ********************************************************************* *
+ *                                                                       *
+ *   =============================================================       *
+ *   Copyright 2002-2010,                                                *
+ *   Christos Sioutis <christos.sioutis@gmail.com>                       *
+ *   =============================================================       *
+ *   This software was developed during my PhD studies at:               *
+ *                                                                       *
+ *   Knowledge Based Intelligent Engineering Systems Centre (KES)        *
+ *   School of Electrical and Information Engineering                    *
+ *   University of South Australia                                       *
+ *   =============================================================       *
+ *                                                                       *
+ *   This file is part of CHRIS.                                         *
+ *                                                                       *
+ *   CHRIS is free software: you can redistribute it and/or              *
+ *   modify it under the terms of the GNU Lesser General Public Licence  *
+ *   as published by the Free Software Foundation, either version 3 of   *
+ *   the License, or (at your option) any later version.                 *
+ *                                                                       *
+ *   CHRIS is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ *   GNU Lesser General Public License for more details.                 *
+ *                                                                       *
+ *   You should have received a copy of the GNU Lesser General Public    *
+ *   License along with CHRIS.                                           *
+ *   If not, see <http://www.gnu.org/licenses/>.                         *
+ *                                                                       *
+ * ********************************************************************* */
+
+
+
+/*
+ * Activation.java
+ *
+ * Created on September 22, 2004, 3:37 PM
+ */
+
+package edu.unisa.chris.decision;
+import java.util.*;
+import edu.unisa.chris.kernel.*;
+import edu.unisa.chris.agent.*;
+import edu.unisa.chris.orientation.*;
+import aos.jack.util.cursor.Change;
+/**
+ * This plan should only succeed if all subgoals successively succeed
+ * @author  Christos Sioutis
+ */
+public plan ExecuteProceduralSubGoalsPlan extends Plan{
+        #handles event ExecuteSubGoalsEvent ev;
+        #posts event Goal goal;
+
+        #uses data Goals goals;
+        #uses interface CHRISFunctions chris;
+
+       static boolean relevant (ExecuteSubGoalsEvent ev){
+            if(ev.type == CHRISConstants.SUBGOAL_PROCEDURAL)
+                return true;
+            return false;
+       }
+
+	body(){
+            chris.logInfo("CHRIS: Decision: ExecuteProceduralSubGoalsPlan: For "+ev.goal,chris.LOG_DECISION,true);
+            List proceduralGoals = goals.getSubGoals(ev.goal,chris.SUBGOAL_PROCEDURAL);
+            for(int i=0; i< proceduralGoals.size(); i++){
+                GoalInfo info = (GoalInfo) proceduralGoals.get(i);
+                chris.logInfo("CHRIS: Decision: ExecuteProceduralSubGoalsPlan: Subtasking "+info.name,chris.LOG_DECISION,true);
+                @subtask(goal.goal(info.name,info.parent));
+            }
+            chris.logInfo("CHRIS: Decision: ExecuteProceduralSubGoalsPlan: Finished "+ev.goal,chris.LOG_DECISION,true);
+	}
+
+        #reasoning method fail(){
+            chris.logInfo("CHRIS: Decision: ExecuteProceduralSubGoalsPlan: Failed "+ev.goal,chris.LOG_DECISION,true);
+        }
+}

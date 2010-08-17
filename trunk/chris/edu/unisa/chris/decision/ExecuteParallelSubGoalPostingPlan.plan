@@ -1,0 +1,72 @@
+/* ********************************************************************* *
+ *                                                                       *
+ *   =============================================================       *
+ *   Copyright 2002-2010,                                                *
+ *   Christos Sioutis <christos.sioutis@gmail.com>                       *
+ *   =============================================================       *
+ *   This software was developed during my PhD studies at:               *
+ *                                                                       *
+ *   Knowledge Based Intelligent Engineering Systems Centre (KES)        *
+ *   School of Electrical and Information Engineering                    *
+ *   University of South Australia                                       *
+ *   =============================================================       *
+ *                                                                       *
+ *   This file is part of CHRIS.                                         *
+ *                                                                       *
+ *   CHRIS is free software: you can redistribute it and/or              *
+ *   modify it under the terms of the GNU Lesser General Public Licence  *
+ *   as published by the Free Software Foundation, either version 3 of   *
+ *   the License, or (at your option) any later version.                 *
+ *                                                                       *
+ *   CHRIS is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ *   GNU Lesser General Public License for more details.                 *
+ *                                                                       *
+ *   You should have received a copy of the GNU Lesser General Public    *
+ *   License along with CHRIS.                                           *
+ *   If not, see <http://www.gnu.org/licenses/>.                         *
+ *                                                                       *
+ * ********************************************************************* */
+
+
+
+/*
+ * Activation.java
+ *
+ * Created on September 22, 2004, 3:37 PM
+ */
+
+package edu.unisa.chris.decision;
+import java.util.*;
+import edu.unisa.chris.kernel.*;
+import edu.unisa.chris.agent.*;
+import edu.unisa.chris.orientation.*;
+import aos.jack.util.cursor.Change;
+/**
+ * This plan posts Alert events for each of the data objects produced by the Activation class
+ * @author  Christos Sioutis
+ */
+public plan ExecuteParallelSubGoalPostingPlan extends Plan{
+        #handles event ExecuteSubGoalPostingEvent ev;
+        #posts event ExecuteSubGoalEvent subGoal;
+
+        #uses data Goals goals;
+        #uses interface CHRISFunctions chris;
+
+       static boolean relevant(ExecuteSubGoalPostingEvent ev){
+            if(ev.type == CHRISConstants.SUBGOAL_PARALLEL)
+                return true;
+            return false;
+       }
+
+	body(){
+            chris.logInfo("CHRIS: Decision: ExecuteParallelSubGoalPostingPlan: Posting for "+ev.goal,chris.LOG_DECISION,true);
+            for(int i=0; i<ev.initial.size(); i++){
+                GoalInfo info = (GoalInfo) ev.initial.get(i);
+                chris.logInfo("CHRIS: Decision: ExecuteParallelSubGoalPostingPlan: Posting "+info.name,chris.LOG_DECISION,true);
+                @post(subGoal.subGoal(info.name,info.parent,ev.parent,ev.initial,CHRISConstants.SUBGOAL_PARALLEL));
+            }
+            @wait_for(new ParallelWaitCursor(goals,ev.initial,false));
+	}
+}

@@ -1,0 +1,137 @@
+/* ********************************************************************* *
+ *                                                                       *
+ *   =============================================================       *
+ *   Copyright 2002-2010,                                                *
+ *   Christos Sioutis <christos.sioutis@gmail.com>                       *
+ *   =============================================================       *
+ *   This software was developed during my PhD studies at:               *
+ *                                                                       *
+ *   Knowledge Based Intelligent Engineering Systems Centre (KES)        *
+ *   School of Electrical and Information Engineering                    *
+ *   University of South Australia                                       *
+ *   =============================================================       *
+ *                                                                       *
+ *   This file is part of CHRIS.                                         *
+ *                                                                       *
+ *   CHRIS is free software: you can redistribute it and/or              *
+ *   modify it under the terms of the GNU Lesser General Public Licence  *
+ *   as published by the Free Software Foundation, either version 3 of   *
+ *   the License, or (at your option) any later version.                 *
+ *                                                                       *
+ *   CHRIS is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ *   GNU Lesser General Public License for more details.                 *
+ *                                                                       *
+ *   You should have received a copy of the GNU Lesser General Public    *
+ *   License along with CHRIS.                                           *
+ *   If not, see <http://www.gnu.org/licenses/>.                         *
+ *                                                                       *
+ * ********************************************************************* */
+
+
+
+/*
+ * Activation.java
+ *
+ * Created on September 22, 2004, 3:37 PM
+ */
+
+package edu.unisa.chris.decision;
+import java.util.*;
+import edu.unisa.chris.agent.*;
+import edu.unisa.chris.learning.*;
+import aos.jack.util.cursor.Change;
+/**
+ * This plan posts Alert events for each of the data objects produced by the Activation class
+ * @author  Christos Sioutis
+ */
+public plan OptionEvaluation extends Plan{
+	#handles event GoalOptions options;
+        #posts event Goal goal;
+        #uses data Goals goals;
+        #uses interface CHRISFunctions chris;
+        #uses data SelectedAction subGoalSelected;
+
+
+	body(){
+                ActionValuePair pair;
+                GoalChoice choice;
+                chris.logInfo("CHRIS: Decision: OptionEvaluation: For "+options.goal,chris.LOG_DECISION,true);
+
+                if(goals.policy == chris.POLICY_EGREEDY)
+                    pair = eGreedy();
+                else
+                    pair = softMax();
+
+                choice = (GoalChoice) pair.action;
+
+                //lets ConsequencePrediction know which subGoal was selected
+                subGoalSelected.add(options.goal,choice);
+
+                while(subGoalSelected.get(options.goal) != null)
+                    @wait_for(new Change(subGoalSelected,false));
+
+                chris.logInfo("CHRIS: Decision: OptionEvaluation: Maintaining "+choice.action,chris.LOG_DECISION,true);
+                @maintain(new GoalActiveCursor(goals,options.goal,options.parent,true),goal.goal(choice.action,options.goal));
+
+                chris.logInfo("CHRIS: Decision: OptionEvaluation: Finished "+options.goal,chris.LOG_DECISION,true);
+	}
+
+        #reasoning method fail(){
+                chris.logInfo("CHRIS: Decision: OptionEvaluation: Failed "+options.goal,chris.LOG_DECISION,true);
+        }
+
+        private ActionValuePair eGreedy(){
+            chris.logInfo("CHRIS: Decision: OptionEvaluation: Using EGREEDY SubGoal Selection",chris.LOG_DECISION,true);
+            if( chris.uniformDouble() < goals.exploration)
+               return (ActionValuePair) options.choices.get(chris.uniformRandom(options.choices.size()));
+            else
+                return (ActionValuePair) options.choices.get(0); //no need to re-query the beliefset as we are using ordered ActionOptions
+        }
+
+        private ActionValuePair softMax(){
+            chris.logInfo("CHRIS: Decision: OptionEvaluation: Using SOFTMAX SubGoal Selection",chris.LOG_DECISION,true);
+            ActionValuePair pair = null;
+            double probability[] = new double[options.choices.size()];
+            double random = chris.uniformDouble();
+            double range = 0.0;
+
+            chris.logInfo("CHRIS: Decision: OptionEvaluation: Using SOFTMAX SubGoal Selection",chris.LOG_DECISION,true);
+
+            for(int i=0; i<options.choices.size(); i++){
+                probability[i] = actionValue(i);
+            }
+
+            for(int i=0; pair == null && i<options.choices.size(); i++){
+                range += probability[i];
+                if(random < range)
+                    pair = (ActionValuePair) options.choices.get(i);
+            }
+            if(pair==null)
+                pair = (ActionValuePair) options.choices.get(options.choices.size()-1);
+
+            return pair;
+        }
+
+        //equiprobability=temperature in Gibbs distribution formula
+        private double actionValue(int action)
+        {
+            ActionValuePair pair = (ActionValuePair)options.choices.get(action);
+            double numerator = Math.exp(pair.value / goals.equiprobability);
+            double denominator = actionSum();
+            return( numerator / denominator);
+
+        }
+
+        private double actionSum()
+        {
+            ActionValuePair pair;
+            double sum = 0.0;
+            for(int i=0; i<options.choices.size(); i++){
+                pair = (ActionValuePair)options.choices.get(i);
+                sum += Math.exp(pair.value / goals.equiprobability);
+             }
+            return sum;
+        }
+}

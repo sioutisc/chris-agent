@@ -1,0 +1,84 @@
+/* ********************************************************************* *
+ *                                                                       *
+ *   =============================================================       *
+ *   Copyright 2002-2010,                                                *
+ *   Christos Sioutis <christos.sioutis@gmail.com>                       *
+ *   =============================================================       *
+ *   This software was developed during my PhD studies at:               *
+ *                                                                       *
+ *   Knowledge Based Intelligent Engineering Systems Centre (KES)        *
+ *   School of Electrical and Information Engineering                    *
+ *   University of South Australia                                       *
+ *   =============================================================       *
+ *                                                                       *
+ *   This file is part of CHRIS.                                         *
+ *                                                                       *
+ *   CHRIS is free software: you can redistribute it and/or              *
+ *   modify it under the terms of the GNU Lesser General Public Licence  *
+ *   as published by the Free Software Foundation, either version 3 of   *
+ *   the License, or (at your option) any later version.                 *
+ *                                                                       *
+ *   CHRIS is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ *   GNU Lesser General Public License for more details.                 *
+ *                                                                       *
+ *   You should have received a copy of the GNU Lesser General Public    *
+ *   License along with CHRIS.                                           *
+ *   If not, see <http://www.gnu.org/licenses/>.                         *
+ *                                                                       *
+ * ********************************************************************* */
+
+
+
+/*
+ * QLearning.java
+ *
+ * Created on October 7, 2004, 8:10 PM
+ */
+
+package edu.unisa.chris.learning;
+import edu.unisa.chris.learning.perception.*;
+import edu.unisa.chris.action.*;
+import edu.unisa.chris.agent.*;
+import edu.unisa.chris.orientation.*;
+import java.util.*;
+/**
+ *
+ * @author  Christos Sioutis
+ */
+public plan EGreedy extends Plan {
+    #handles event ChooseAction choose;
+    //#reads data ActionsAvailable actionsAvailable;
+    #uses data SelectedAction selectedAction;
+    #uses interface CHRISFunctions chris;
+    #uses data StateActionValueFunction saValueFunction;
+    //#uses data CurrentStateInstance currentStateInstance;
+    //#uses data SkillControl skillControl;
+
+    static boolean relevant(ChooseAction choose){
+        return ( choose.goal.learning == CHRISConstants.LEARNING_ACTIVE &&
+                 choose.goal.policy == CHRISConstants.POLICY_EGREEDY);
+    }
+
+    body(){
+        chris.logInfo("CHRIS: Learning: EGreedy: Entering Action Selection (exploration="+choose.goal.exploration+")",chris.LOG_LEARNING,true);
+        List actions = choose.goal.getActionsAvailable(chris,choose.state,saValueFunction);
+        chris.logInfo("CHRIS: Learning: EGreedy: Number of Actions = "+actions.size(),chris.LOG_LEARNING,true);
+        ActionOptions options = saValueFunction.getActionOptions(choose.goal.name, choose.perception, actions);
+        chris.logInfo("CHRIS: Learning: EGreedy: Number of Action Options = "+options.size(),chris.LOG_LEARNING,true);
+        chris.logInfo("*** CHRIS: Learning: Egreedy: ***"+options,chris.LOG_LEARNING,true);
+
+        ActionValuePair pair;
+        if( chris.uniformDouble() < choose.goal.exploration){
+           selectedAction.add(choose.goal.name,(Action)actions.get(chris.uniformRandom(actions.size())));
+        }
+        else{
+            //pair = (ActionValuePair) saValueFunction.getBestAction(choose.goal.name, choose.perception, actions);
+            pair = (ActionValuePair) options.getFirst(); //no need to re-query the beliefset as we already have ordered ActionOptions
+            selectedAction.add(choose.goal.name,(pair.action));
+        }
+ 
+ 
+    }
+}

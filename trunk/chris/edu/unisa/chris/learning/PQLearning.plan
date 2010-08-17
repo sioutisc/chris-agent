@@ -1,0 +1,160 @@
+/* ********************************************************************* *
+ *                                                                       *
+ *   =============================================================       *
+ *   Copyright 2002-2010,                                                *
+ *   Christos Sioutis <christos.sioutis@gmail.com>                       *
+ *   =============================================================       *
+ *   This software was developed during my PhD studies at:               *
+ *                                                                       *
+ *   Knowledge Based Intelligent Engineering Systems Centre (KES)        *
+ *   School of Electrical and Information Engineering                    *
+ *   University of South Australia                                       *
+ *   =============================================================       *
+ *                                                                       *
+ *   This file is part of CHRIS.                                         *
+ *                                                                       *
+ *   CHRIS is free software: you can redistribute it and/or              *
+ *   modify it under the terms of the GNU Lesser General Public Licence  *
+ *   as published by the Free Software Foundation, either version 3 of   *
+ *   the License, or (at your option) any later version.                 *
+ *                                                                       *
+ *   CHRIS is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ *   GNU Lesser General Public License for more details.                 *
+ *                                                                       *
+ *   You should have received a copy of the GNU Lesser General Public    *
+ *   License along with CHRIS.                                           *
+ *   If not, see <http://www.gnu.org/licenses/>.                         *
+ *                                                                       *
+ * ********************************************************************* */
+
+
+
+/*
+ * PQLearning.plan
+ * (Passive QLearning)
+ *
+ * Created on October 7, 2004, 8:10 PM
+ */
+
+package edu.unisa.chris.learning;
+import edu.unisa.chris.learning.perception.*;
+import edu.unisa.chris.action.*;
+import edu.unisa.chris.orientation.*;
+import edu.unisa.chris.agent.*;
+import aos.jack.util.cursor.Change;
+/**
+ * PQLearning Algorithm (A=Action, S=State, R=Reward) 
+ * 1. Observe A,S
+ * 2. repeat(for each step in episode) //episode=while target is active
+ * 3.    Observe A',S'
+ * 4.    Calculate R
+ * 5.    D = R + GAMMA * argmax(A',Q(S',A')) - Q(S,A)
+ * 6.    Q(S,A) = Q(S,A) + alpha * D
+ * 7.    S = S'
+ * 8.    A = A'
+ * 9. end repeat
+ *
+ * @author  Christos Sioutis
+ */
+public plan PQLearning extends Plan {
+    #handles event Learn learn;
+    #posts event SkillControlEvent skillControl;
+    #uses data StateActionValueFunction saValueFunction;
+    #uses data LearningGoals learningGoals;
+    //#uses data ActionsAvailable actionsAvailable;
+    #uses data CurrentStateInstance currentStateInstance;
+    #uses data Scheduler scheduler;
+
+    #uses data SelectedAction selectedAction;
+    #uses interface CHRISFunctions chris;
+
+    StateInstance state, stateNew;
+    Perception perception, perceptionNew;
+    double value, valueNew, valueNext, reward, delta;
+    Action action, actionNew;
+    ActionOptions options;
+    ActionValuePair bestNextAction;
+    int targetStatus;
+    double vfChange;
+
+    static boolean relevant(Learn learn){
+        return ( learn.goal.learning == CHRISConstants.LEARNING_PASSIVE &&
+                 learn.goal.algorithm == CHRISConstants.RL_QLEARNING);
+    }
+
+
+    body(){
+        chris.logInfo("CHRIS: Learning: PQLEARNING: Entering Algorithm",chris.LOG_LEARNING,true);
+
+        if(scheduler.getActiveTarget()!=null && learn.target.equals(scheduler.getActiveTarget())){
+            chris.logInfo("CHRIS: Learning: QLEARNING: -> Waiting for initial StateInstance",chris.LOG_LEARNING,true);
+            //wait for a stateInstance to be available
+            while(currentStateInstance.getCurrentStateInstance() == null)
+                @wait_for(new Change(currentStateInstance,true));
+
+            chris.logInfo("CHRIS: Learning: PQLEARNING: 1. observe S,A",chris.LOG_LEARNING,true);
+            StateInstance state = currentStateInstance.getCurrentStateInstance();
+            Perception perception = learn.goal.getPerception(state,saValueFunction);
+
+            chris.logInfo("CHRIS: Learning: PQLEARNING: -> Waiting for action selection",chris.LOG_LEARNING,true);
+            while(selectedAction.get(learn.goal.name) == null)
+                @wait_for(new Change(selectedAction,false));
+            action = selectedAction.getAndRemove(learn.goal.name);
+            chris.logInfo("CHRIS: Learning: PQLEARNING: -> Action Selected= "+action,chris.LOG_LEARNING,true);
+
+            while(scheduler.getActiveTarget()!=null && learn.target.equals(scheduler.getActiveTarget())){
+                chris.logInfo("CHRIS: Learning: PQLEARNING: 2. repeat(for each step in episode)",chris.LOG_LEARNING,true);
+            
+                chris.logInfo("CHRIS: Learning: PQLEARNING: 3. observe A',S'",chris.LOG_LEARNING,true);
+
+                chris.logInfo("CHRIS: Learning: PQLEARNING: -> Waiting for action selection",chris.LOG_LEARNING,true);
+                while(selectedAction.get(learn.goal.name) == null)
+                    @wait_for(new Change(selectedAction,false));
+                actionNew = selectedAction.get(learn.goal.name);
+                chris.logInfo("CHRIS: Learning: PQLEARNING: -> Action Selected= "+actionNew,chris.LOG_LEARNING,true);
+
+                //@wait_for(new Change(currentStateInstance,false));
+                stateNew = currentStateInstance.getCurrentStateInstance();
+                perceptionNew = learn.goal.getPerception(stateNew,saValueFunction);
+
+                chris.logInfo("CHRIS: Learning: PQLEARNING: 4. Calculate R",chris.LOG_LEARNING,true);
+                reward = learn.goal.rewardFunction(perception, action, perceptionNew);
+                chris.logInfo("CHRIS: Learning: PQLEARNING: -> Reward Recieved="+reward,chris.LOG_LEARNING,true);
+
+                chris.logInfo("CHRIS: Learning: PQLEARNING: 5. D = R + GAMMA * argmax(A',Q(S',A')) - Q(S,A)",chris.LOG_LEARNING,true);
+                options = saValueFunction.getActionOptions(learn.goal.name,perceptionNew,learn.goal.getActionsAvailable(chris,stateNew,saValueFunction));
+                bestNextAction = options.getFirst();
+                value = saValueFunction.getValue(learn.goal.name,perception,action);
+                valueNext = bestNextAction.value;
+                delta = reward + (learn.goal.discountFactor * valueNext) - value;
+
+                chris.logInfo("CHRIS: Learning: PQLEARNING: 6. Q(S,A) = Q(S,A) + alpha * D",chris.LOG_LEARNING,true);                
+                saValueFunction.add(learn.goal.name,perception,action, value + (learn.goal.stepSizeParameter * delta));
+
+                chris.logInfo("CHRIS: Learning: PQLEARNING: 7. S = S'",chris.LOG_LEARNING,true);                
+                state = stateNew;
+                perception = perceptionNew;
+
+                chris.logInfo("CHRIS: Learning: PQLEARNING: 8. A = A'",chris.LOG_LEARNING,true);                
+                action = actionNew;
+
+                targetStatus = learn.goal.getGoalStatus(state);
+                if(targetStatus == chris.GOAL_FAILED || targetStatus == chris.GOAL_IMPOSSIBLE || targetStatus == chris.GOAL_ACHIEVED)
+                   scheduler.remove(learn.target);
+
+                //used for updating skillControl
+                vfChange += valueNew-value;
+                
+                //allow the external plan to continue not that the status has been updated
+                selectedAction.getAndRemove(learn.goal.name);
+            }
+            //remove any final actions that were selected by the external plan
+            selectedAction.getAndRemove(learn.goal.name);
+
+            if(learn.goal.skillControl == true)
+                @subtask(skillControl.skillControl(learn.goal,vfChange));
+        }
+    }
+}

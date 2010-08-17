@@ -1,0 +1,92 @@
+/* ********************************************************************* *
+ *                                                                       *
+ *   =============================================================       *
+ *   Copyright 2002-2010,                                                *
+ *   Christos Sioutis <christos.sioutis@gmail.com>                       *
+ *   =============================================================       *
+ *   This software was developed during my PhD studies at:               *
+ *                                                                       *
+ *   Knowledge Based Intelligent Engineering Systems Centre (KES)        *
+ *   School of Electrical and Information Engineering                    *
+ *   University of South Australia                                       *
+ *   =============================================================       *
+ *                                                                       *
+ *   This file is part of CHRIS.                                         *
+ *                                                                       *
+ *   CHRIS is free software: you can redistribute it and/or              *
+ *   modify it under the terms of the GNU Lesser General Public Licence  *
+ *   as published by the Free Software Foundation, either version 3 of   *
+ *   the License, or (at your option) any later version.                 *
+ *                                                                       *
+ *   CHRIS is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ *   GNU Lesser General Public License for more details.                 *
+ *                                                                       *
+ *   You should have received a copy of the GNU Lesser General Public    *
+ *   License along with CHRIS.                                           *
+ *   If not, see <http://www.gnu.org/licenses/>.                         *
+ *                                                                       *
+ * ********************************************************************* */
+
+
+
+/*
+ * QLearning.java
+ *
+ * Created on October 7, 2004, 8:10 PM
+ */
+
+package edu.unisa.chris.learning;
+import edu.unisa.chris.learning.perception.*;
+import edu.unisa.chris.action.*;
+import edu.unisa.chris.agent.*;
+import edu.unisa.chris.orientation.*;
+import java.util.*;
+/**
+ *
+ * @author  Christos Sioutis
+ */
+public plan SkillControlPlan extends Plan {
+    #handles event SkillControlEvent ev;
+    #uses interface CHRISFunctions chris;
+
+    body(){
+        double vfChange = ev.vfChange;
+        if(vfChange > ev.learningGoal.vfMaxChange)
+            ev.learningGoal.vfMaxChange = vfChange;
+
+        double delta = vfChange/ev.learningGoal.vfMaxChange;
+        ev.learningGoal.confidence = 1 - delta;
+
+        
+        if(ev.learningGoal.explorationControl == true){
+            if(ev.learningGoal.explorationChangeExponential == true)
+                ev.learningGoal.exploration = ev.learningGoal.explorationMinimum + (1-Math.pow(ev.learningGoal.confidence,2)) * (ev.learningGoal.explorationMaximum-ev.learningGoal.explorationMinimum);
+            else
+                ev.learningGoal.exploration = ev.learningGoal.explorationMinimum + (1-ev.learningGoal.confidence) * (ev.learningGoal.explorationMaximum-ev.learningGoal.explorationMinimum);
+
+        }
+
+        if(ev.learningGoal.stepSizeControl == true){
+            if(ev.learningGoal.stepSizeChangeExponential == true)
+                ev.learningGoal.stepSizeParameter = ev.learningGoal.stepSizeMinimum + (1-Math.pow(ev.learningGoal.confidence,2)) * (ev.learningGoal.stepSizeMaximum-ev.learningGoal.stepSizeMinimum);
+            else
+                ev.learningGoal.stepSizeParameter = ev.learningGoal.stepSizeMinimum + (1-ev.learningGoal.confidence) * (ev.learningGoal.stepSizeMaximum-ev.learningGoal.stepSizeMinimum);
+
+        }
+            
+        if(ev.learningGoal.learningTypeControl == true){
+            if(ev.learningGoal.learning == CHRISConstants.LEARNING_PASSIVE &&
+               ev.learningGoal.confidence > ev.learningGoal.activeThreshold){
+                ev.learningGoal.learning = CHRISConstants.LEARNING_ACTIVE;
+
+            }
+            else if(ev.learningGoal.learning == CHRISConstants.LEARNING_ACTIVE &&
+                ev.learningGoal.confidence < ev.learningGoal.passiveThreshold){
+                ev.learningGoal.learning = CHRISConstants.LEARNING_PASSIVE;
+            }
+        }
+        //System.out.println("confidense="+ev.learningGoal.confidence+",exploration="+ev.learningGoal.exploration);
+    }
+}
