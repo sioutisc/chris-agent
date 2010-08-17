@@ -1,0 +1,119 @@
+/* ********************************************************************* *
+ *                                                                       *
+ *   =============================================================       *
+ *   Copyright 2002-2010,                                                *
+ *   Christos Sioutis <christos.sioutis@gmail.com>                       *
+ *   =============================================================       *
+ *   This software was developed during my PhD studies at:               *
+ *                                                                       *
+ *   Knowledge Based Intelligent Engineering Systems Centre (KES)        *
+ *   School of Electrical and Information Engineering                    *
+ *   University of South Australia                                       *
+ *   =============================================================       *
+ *                                                                       *
+ *   This file is part of CHRIS.                                         *
+ *                                                                       *
+ *   CHRIS is free software: you can redistribute it and/or              *
+ *   modify it under the terms of the GNU Lesser General Public Licence  *
+ *   as published by the Free Software Foundation, either version 3 of   *
+ *   the License, or (at your option) any later version.                 *
+ *                                                                       *
+ *   CHRIS is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ *   GNU Lesser General Public License for more details.                 *
+ *                                                                       *
+ *   You should have received a copy of the GNU Lesser General Public    *
+ *   License along with CHRIS.                                           *
+ *   If not, see <http://www.gnu.org/licenses/>.                         *
+ *                                                                       *
+ * ********************************************************************* */
+
+
+ 
+ 
+package edu.unisa.chris_examples.joshua;
+import edu.unisa.chris.orientation.*;
+import java.util.*;
+
+/**
+ * @author Christos Sioutis
+ *
+ */
+public view TTTState implements State{
+    private int[] cells = new int[9];
+    private int wins;
+    private int losses;
+    private int draws;
+
+    #uses data CurrentStateInstance currentStateInstance;
+
+    public int getWins(){
+        return wins;
+    }
+    public int getDraws(){
+        return draws;
+    }
+    public int getLosses(){
+        return losses;
+    }
+
+    public void stateChange(){
+        try{
+            currentStateInstance.add(getInstance());
+        }
+        catch(Exception e){
+            System.out.println(e);
+        }
+    }
+
+    public boolean newGame(){
+        for(int i=0; i<cells.length; i++){
+            if(cells[i]>0)
+                return false;
+        }
+        return true;
+    }
+
+    public StateInstance getInstance(){
+        int[] newCells = {cells[0],cells[1],cells[2],cells[3],cells[4],cells[5],cells[6],cells[7],cells[8]};
+        return new TTTStateInstance(newCells,wins,losses,draws);
+    }
+
+    public void updateValue(String value){
+        StringTokenizer st = new StringTokenizer(value);
+        while(st.hasMoreTokens()){
+            int type = Integer.parseInt(st.nextToken());
+            int index = Integer.parseInt(st.nextToken());
+            cells[index] = type;
+        }
+    }
+
+    public void updateState(String update){
+        if(update.equals("won")){
+            cells = new int[9];
+            wins++;
+        }
+        else if(update.equals("lost")){
+            cells = new int[9];
+            losses++;
+        }
+        else if(update.equals("draw")){
+            cells = new int[9];
+            draws++;
+        }
+        else{
+            updateValue(update);
+        }
+        stateChange();
+    }
+
+    public String toString(){
+        StringBuffer toReturn = new StringBuffer("TTTState{");
+        for(int i=0; i<cells.length; i++)
+            toReturn.append(cells[i]+",");
+        toReturn.append("}");
+        return toReturn.toString();
+    }
+    
+}
