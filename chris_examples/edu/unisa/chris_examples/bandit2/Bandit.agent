@@ -1,0 +1,139 @@
+/* ********************************************************************* *
+ *                                                                       *
+ *   =============================================================       *
+ *   Copyright 2002-2010,                                                *
+ *   Christos Sioutis <christos.sioutis@gmail.com>                       *
+ *   =============================================================       *
+ *   This software was developed during my PhD studies at:               *
+ *                                                                       *
+ *   Knowledge Based Intelligent Engineering Systems Centre (KES)        *
+ *   School of Electrical and Information Engineering                    *
+ *   University of South Australia                                       *
+ *   =============================================================       *
+ *                                                                       *
+ *   This file is part of CHRIS.                                         *
+ *                                                                       *
+ *   CHRIS is free software: you can redistribute it and/or              *
+ *   modify it under the terms of the GNU Lesser General Public Licence  *
+ *   as published by the Free Software Foundation, either version 3 of   *
+ *   the License, or (at your option) any later version.                 *
+ *                                                                       *
+ *   CHRIS is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ *   GNU Lesser General Public License for more details.                 *
+ *                                                                       *
+ *   You should have received a copy of the GNU Lesser General Public    *
+ *   License along with CHRIS.                                           *
+ *   If not, see <http://www.gnu.org/licenses/>.                         *
+ *                                                                       *
+ * ********************************************************************* */
+
+
+
+package edu.unisa.chris_examples.bandit2;
+import edu.unisa.chris.agent.*;
+import edu.unisa.chris.orientation.*;
+import edu.unisa.chris.observation.*;
+import edu.unisa.chris.action.*;
+import edu.unisa.chris.decision.*;
+import java.util.*;
+/**
+ * @author Christos Sioutis
+ */
+public agent Bandit extends LearningAgent implements BanditChoice{
+        #private data BanditState state();
+        #private data TenChoiceTestbed testBed();
+        #posts event StateChange change;
+        #has capability CHRIS chris;
+        #posts event Sensation sensation;
+        #posts event Target target;
+        List banditActions = new LinkedList();
+
+        #posts event ActionEvent; //by RandomSelectionPlan
+        #handles event ActionEvent;
+        #handles event Target;
+        #uses plan BanditPlan;
+        #uses plan RandomSelectionPlan;
+
+        int numTries;
+
+        public Bandit(String learningType, int numberOfTries, boolean skillEnabled, String logLevels){
+		super("bandit");
+                numTries = numberOfTries;
+                if(logLevels!=null)
+                    setLogLevels(logLevels);
+                testBed.init(new Integer(numberOfTries),this);
+                for(int i=0;i<10; i++){
+                    banditActions.add(new BanditAction(i));
+                }
+                
+                try{
+                    state.add(0.0);
+                    if(learningType.equals("active"))
+                        chris.learningGoals.add("FindBestAction", new BanditLearningGoal(CHRISConstants.LEARNING_ACTIVE, numTries, false));
+                    else
+                        chris.learningGoals.add("FindBestAction",new BanditLearningGoal(CHRISConstants.LEARNING_PASSIVE, numTries, skillEnabled));
+                }
+                    catch(Exception e){
+                    e.printStackTrace();
+                }
+                uniform.setSeed(20934882);
+                gaussian.setSeed(73409589);
+	}
+
+
+        public void activateDecisionProcess(Object rawData){
+            postEvent(sensation.sensation(rawData));
+        }
+
+        public void updateWorldState(Object informationValues) {
+            logInfo("BANDIT: Entering UpdateWorldState",LOG_AGENT,true);
+            try{
+                state.add(((Double)informationValues).doubleValue());
+            }
+            catch(Exception e){
+                System.out.println("Error accessing State beliefset");
+                System.exit(1);
+            }
+        }
+
+        public List getActionsAvailable(StateInstance state){
+            return banditActions; //the actions are always the same
+        }
+
+
+        public void findBestAction(){
+            for(int i=0; i<numTries; i++){
+                //provides some feedback on the progress
+                if(i!=0 && i%1000 == 0)
+                    System.out.println(i);
+                else if(i%100 == 0)
+                    System.out.print(i + " ");
+                    postEventAndWait(target.target("FindBestAction","_Agent_",new BanditStateInstance(0)));
+                }
+        }
+
+        public void choose(int choice){
+            try{
+                //chris.actions.add(new BanditAction(choice),true);
+                testBed.step(choice);
+                //chris.actions.add(new BanditAction(choice),false);
+            }
+            catch(Exception e){
+                e.printStackTrace();
+            }
+        }
+
+        public void printPlots(){
+            System.out.println(testBed.getPlots());
+        }
+
+        public void loadLearning(String fileName){
+            chris.loadLearning(fileName);
+        }
+
+        public void saveLearning(String fileName){
+            chris.saveLearning(fileName);
+        }
+}

@@ -1,0 +1,161 @@
+/* ********************************************************************* *
+ *                                                                       *
+ *   =============================================================       *
+ *   Copyright 2002-2010,                                                *
+ *   Christos Sioutis <christos.sioutis@gmail.com>                       *
+ *   =============================================================       *
+ *   This software was developed during my PhD studies at:               *
+ *                                                                       *
+ *   Knowledge Based Intelligent Engineering Systems Centre (KES)        *
+ *   School of Electrical and Information Engineering                    *
+ *   University of South Australia                                       *
+ *   =============================================================       *
+ *                                                                       *
+ *   This file is part of CHRIS.                                         *
+ *                                                                       *
+ *   CHRIS is free software: you can redistribute it and/or              *
+ *   modify it under the terms of the GNU Lesser General Public Licence  *
+ *   as published by the Free Software Foundation, either version 3 of   *
+ *   the License, or (at your option) any later version.                 *
+ *                                                                       *
+ *   CHRIS is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ *   GNU Lesser General Public License for more details.                 *
+ *                                                                       *
+ *   You should have received a copy of the GNU Lesser General Public    *
+ *   License along with CHRIS.                                           *
+ *   If not, see <http://www.gnu.org/licenses/>.                         *
+ *                                                                       *
+ * ********************************************************************* */
+
+
+
+/*
+ * Activation.java
+ *
+ * Created on September 22, 2004, 3:37 PM
+ */
+
+package edu.unisa.chris_examples.joshua;
+import edu.unisa.chris.action.*;
+import edu.unisa.chris.orientation.*;
+import edu.unisa.chris.decision.*;
+import edu.unisa.chris.learning.*;
+import edu.unisa.chris.agent.*;
+import aos.jack.util.cursor.Change;
+import java.util.*;
+/**
+ * This plan posts Alert events for each of the data objects produced by the Activation class
+ * @author  Christos Sioutis
+ */
+public plan TTTWinPlan extends Plan{
+        #handles event Target ev;
+        #uses data LearningGoals learningGoals;
+        #uses data Scheduler scheduler;
+        #uses interface CHRISFunctions chris;
+        #uses data CurrentStateInstance currentStateInstance;
+        #uses data SelectedAction selectedAction;
+        #posts event ActionEvent aev;
+
+        public boolean relevant(Target ev){
+            return ev.name.equals("TTTWin");
+        }
+
+        logical LearningGoal learningGoal;
+        context(){
+            learningGoals.get(ev.parent,learningGoal);
+        }
+
+        List actions;
+        TTTStateInstance state;
+	body(){
+            Action choice = null;
+            LearningGoal goal = (LearningGoal) learningGoal.as_object();
+            boolean first = true;
+            while(continueTarget()){
+                choice = null;
+
+                state = (TTTStateInstance) currentStateInstance.getCurrentStateInstance();
+                actions = chris.getActionsAvailable(state);
+
+                //if about to win ..... win                
+                choice = finishingAction(1);
+
+                //if about to lose ... block
+                if(choice==null)
+                    choice = finishingAction(2);                
+
+                if(choice==null)
+                    choice = (Action) actions.get(chris.uniformRandom(actions.size()));
+		    
+                //tell the learning which action was chosen
+                selectedAction.add(goal.name,choice);
+
+                //wait for learning to take the selected action before continuing execution
+                while(selectedAction.get(goal.name) != null)
+                    @wait_for(new Change(selectedAction,false));
+                
+                if(continueTarget())
+                    @subtask(aev.takeAction(choice));
+            }
+        }
+
+        private Action finishingAction(int type){
+            for(int i=0; i<actions.size(); i++){
+                TTTPlay play = (TTTPlay)actions.get(i);
+                int tmp = state.cells[play.index];
+                state.cells[play.index] = type;
+                if(status(state) == type)
+                    return play;
+                state.cells[play.index] = tmp;
+            }
+            return null;
+        }
+
+        private boolean continueTarget(){
+            return scheduler.getActiveTarget()!=null && ev.parent.equals(scheduler.getActiveTarget());
+        }
+
+        private int status(TTTStateInstance state){
+            //vertical check
+            if(state.cells[0] > 0 &&
+               state.cells[0] == state.cells[3] &&
+               state.cells[0] == state.cells[6])
+                return state.cells[0];
+            if(state.cells[1] > 0 &&
+               state.cells[1] == state.cells[4] &&
+               state.cells[1] == state.cells[7])
+                return state.cells[1];
+            if(state.cells[2] > 0 &&
+               state.cells[2] == state.cells[5] &&
+               state.cells[2] == state.cells[8])
+                return state.cells[2];
+
+            //horizontal check
+            if(state.cells[0] > 0 &&
+               state.cells[0] == state.cells[1] &&
+               state.cells[0] == state.cells[2])
+                return state.cells[0];
+            if(state.cells[3] > 0 &&
+               state.cells[3] == state.cells[4] &&
+               state.cells[3] == state.cells[5])
+                return state.cells[3];
+            if(state.cells[6] > 0 &&
+               state.cells[6] == state.cells[7] &&
+               state.cells[6] == state.cells[8])
+                return state.cells[6];
+
+            //diagonal
+            if(state.cells[0] > 0 &&
+               state.cells[0] == state.cells[4] &&
+               state.cells[0] == state.cells[8])
+                return state.cells[4];
+            if(state.cells[6] > 0 &&
+               state.cells[6] == state.cells[4] &&
+               state.cells[6] == state.cells[2])
+                return state.cells[4];
+
+            return -1;
+        }
+}

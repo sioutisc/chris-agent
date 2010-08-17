@@ -1,0 +1,176 @@
+/* ********************************************************************* *
+ *                                                                       *
+ *   =============================================================       *
+ *   Copyright 2002-2010,                                                *
+ *   Christos Sioutis <christos.sioutis@gmail.com>                       *
+ *   =============================================================       *
+ *   This software was developed during my PhD studies at:               *
+ *                                                                       *
+ *   Knowledge Based Intelligent Engineering Systems Centre (KES)        *
+ *   School of Electrical and Information Engineering                    *
+ *   University of South Australia                                       *
+ *   =============================================================       *
+ *                                                                       *
+ *   This file is part of CHRIS.                                         *
+ *                                                                       *
+ *   CHRIS is free software: you can redistribute it and/or              *
+ *   modify it under the terms of the GNU Lesser General Public Licence  *
+ *   as published by the Free Software Foundation, either version 3 of   *
+ *   the License, or (at your option) any later version.                 *
+ *                                                                       *
+ *   CHRIS is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ *   GNU Lesser General Public License for more details.                 *
+ *                                                                       *
+ *   You should have received a copy of the GNU Lesser General Public    *
+ *   License along with CHRIS.                                           *
+ *   If not, see <http://www.gnu.org/licenses/>.                         *
+ *                                                                       *
+ * ********************************************************************* */
+
+
+
+package edu.unisa.chris_examples.joshua;
+import edu.unisa.chris.agent.*;
+import edu.unisa.chris.orientation.*;
+import edu.unisa.chris.observation.*;
+import edu.unisa.chris.action.*;
+import edu.unisa.chris.decision.*;
+import java.util.*;
+/**
+ * @author Christos Sioutis
+ */
+public agent Joshua extends LearningAgent implements JoshuaPlay{
+        #has capability CHRIS chris;
+        #private data TTTState state(chris.orientationStage.currentStateInstance);
+        #posts event Sensation sensation;
+        #handles event ActionEvent;
+        #uses plan MakeMovePlan;
+
+        //used for passive learning
+        #posts event ActionEvent;
+        #handles event Target;
+        #uses plan TTTWinPlan;
+
+        #posts event Goal goal;
+  
+        TicTacToe environment;
+
+        int numTries;
+
+        int type = 1;
+
+        public Joshua(TicTacToe env, String logLevels, int type, double exploration){
+		super("joshua",logLevels);
+                try{
+                    chris.goals.add("Win","_Agent_",0,false,9,0,0,0);
+                    chris.learningGoals.add("Win",new TTTLearningGoal(exploration));
+                }
+                catch(Exception e){
+                    System.out.println(e);
+                    System.exit(1);
+                }
+                environment = env;
+                this.type = type;
+	}
+
+        public Joshua(TicTacToe env, String logLevels, int type, double exploration, boolean skillControlEnabled){
+		super("joshua",logLevels);
+                try{
+                    chris.goals.add("Win","_Agent_",0,false,9,0,0,0);
+                    chris.learningGoals.add("Win",new TTTLearningGoal(exploration,skillControlEnabled));
+                }
+                catch(Exception e){
+                    System.out.println(e);
+                    System.exit(1);
+                }
+                environment = env;
+                this.type = type;
+	}
+
+        int[] board = new int[2];;
+        int[] indexes = {1,2,4,8,16,32,64,128,256};
+        public Object generateInformationData(Object alertData){
+            int[] newBoard = new int[2];
+            int diff;
+            String toReturn = "";
+
+            if(alertData instanceof String){
+                toReturn = (String) alertData;
+            }
+            else{
+                newBoard = (int[]) alertData;
+                for(int i=0; i<board.length; i++){
+                    if(board[i] != newBoard[i]){
+                        diff =  newBoard[i] - board[i];
+                        for(int j=0; j<indexes.length; j++){
+                            if(diff == indexes[j])
+                            toReturn += (i+1)+" "+j+" "; 
+                        }
+                    }
+                }
+            }
+            board = newBoard;
+            return toReturn;
+        }
+
+        public void activateDecisionProcess(Object rawData){
+            postEvent(sensation.sensation(rawData));
+        }
+
+        public void updateWorldState(Object informationValues) {
+            logInfo("JOSHUA: Entering UpdateWorldState: "+informationValues,LOG_AGENT,true);
+            String info = (String) informationValues;
+            try{
+                //if(info.equals("win")||info.equals("lost")||info.equals("draw")){
+                    state.updateState((String)informationValues);
+                //}
+                //else
+                if(!chris.goals.isActive("Win","_Agent_")){
+                        if(state.newGame()){
+                            List actions = getActionsAvailable(new TTTStateInstance(new int[9],state.getWins(),state.getLosses(),state.getDraws()));
+                            int randomChoice = uniformRandom(actions.size());
+                            play((TTTPlay)actions.get(randomChoice));
+                        }
+                        else{
+                            win();
+                        }
+//                        state.updateState((String)informationValues);
+                }
+//                else
+//                    state.updateState((String)informationValues);
+            }
+            catch(Exception e){
+                System.out.println(e);
+            }
+        }
+
+        public List getActionsAvailable(StateInstance state){
+            TTTStateInstance s = (TTTStateInstance) state;
+            List list = new LinkedList();
+            for(int i=0; i<s.cells.length; i++){
+                if(s.cells[i] == 0){
+                    //has not been played
+                    list.add(new TTTPlay(type,i));  
+                }
+            }
+            return list;
+        }
+
+        public void win(){
+            postEvent(goal.goal("Win","_Agent_"));
+        }
+
+        public void loadLearning(String fileName){
+            chris.loadLearning(fileName);
+        }
+
+        public void saveLearning(String fileName){
+            chris.saveLearning(fileName);
+        }
+
+        public void play(TTTPlay play){
+            environment.agentChoice(play.index);
+        }
+}
