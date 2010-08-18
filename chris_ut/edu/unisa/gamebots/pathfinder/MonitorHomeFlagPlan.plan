@@ -1,0 +1,76 @@
+/* ********************************************************************* *
+ *                                                                       *
+ *   =============================================================       *
+ *   Copyright 2002-2010,                                                *
+ *   Christos Sioutis <christos.sioutis@gmail.com>                       *
+ *   =============================================================       *
+ *   This software was developed during my PhD studies at:               *
+ *                                                                       *
+ *   Knowledge Based Intelligent Engineering Systems Centre (KES)        *
+ *   School of Electrical and Information Engineering                    *
+ *   University of South Australia                                       *
+ *   =============================================================       *
+ *                                                                       *
+ *   This file is part of CHRIS.                                         *
+ *                                                                       *
+ *   CHRIS is free software: you can redistribute it and/or              *
+ *   modify it under the terms of the GNU Lesser General Public Licence  *
+ *   as published by the Free Software Foundation, either version 3 of   *
+ *   the License, or (at your option) any later version.                 *
+ *                                                                       *
+ *   CHRIS is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ *   GNU Lesser General Public License for more details.                 *
+ *                                                                       *
+ *   You should have received a copy of the GNU Lesser General Public    *
+ *   License along with CHRIS.                                           *
+ *   If not, see <http://www.gnu.org/licenses/>.                         *
+ *                                                                       *
+ * ********************************************************************* */
+
+
+
+/*
+ * Activation.java
+ *
+ * Created on September 22, 2004, 3:37 PM
+ */
+
+package edu.unisa.gamebots.pathfinder;
+import edu.unisa.chris.decision.*;
+import edu.unisa.chris.agent.*;
+import edu.unisa.chris.action.*;
+import edu.unisa.gamebots.utjackinterface.*;
+import edu.unisa.gamebots.utjackinterface.controller.*;
+import edu.unisa.gamebots.utjackinterface.caps.sync.*;
+import edu.unisa.gamebots.utjackinterface.caps.move.*;
+import aos.jack.util.cursor.Change;
+import java.util.*;
+/**
+ * This plan posts Alert events for each of the data objects produced by the Activation class
+ * @author  Christos Sioutis
+ */
+public plan MonitorHomeFlagPlan extends Plan{
+        #handles event Target ev;
+        #uses interface UtCommands ut;
+        #uses interface CHRISFunctions chris;
+        #uses data Self self;
+        #uses data Flags flags;
+        #uses data Actions actions;
+        UtCoordinate initial, current;
+
+
+        static boolean relevant(Target ev){
+            return ev.name.equals("MonitorHomeFlag");
+        }
+
+	body(){
+            chris.logInfo("PATHFINDER: Monitoring home flag",chris.LOG_AGENT,true);
+            @wait_for(new HomeFlagFoundCursor(actions,self,flags,false));
+            chris.logInfo("PATHFINDER: HOME flag reached!",chris.LOG_AGENT,true);
+            //chris.logInfo("PATHFINDER: Wait for Learning to process +ve reward and finish home search",chris.LOG_AGENT,true);
+            //@sleep(0.01);
+            chris.logInfo("PATHFINDER: Exiting Home Search",chris.LOG_AGENT,true);
+	}
+}

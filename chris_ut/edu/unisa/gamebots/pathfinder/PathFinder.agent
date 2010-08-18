@@ -1,0 +1,187 @@
+/* ********************************************************************* *
+ *                                                                       *
+ *   =============================================================       *
+ *   Copyright 2002-2010,                                                *
+ *   Christos Sioutis <christos.sioutis@gmail.com>                       *
+ *   =============================================================       *
+ *   This software was developed during my PhD studies at:               *
+ *                                                                       *
+ *   Knowledge Based Intelligent Engineering Systems Centre (KES)        *
+ *   School of Electrical and Information Engineering                    *
+ *   University of South Australia                                       *
+ *   =============================================================       *
+ *                                                                       *
+ *   This file is part of CHRIS.                                         *
+ *                                                                       *
+ *   CHRIS is free software: you can redistribute it and/or              *
+ *   modify it under the terms of the GNU Lesser General Public Licence  *
+ *   as published by the Free Software Foundation, either version 3 of   *
+ *   the License, or (at your option) any later version.                 *
+ *                                                                       *
+ *   CHRIS is distributed in the hope that it will be useful,            *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *
+ *   GNU Lesser General Public License for more details.                 *
+ *                                                                       *
+ *   You should have received a copy of the GNU Lesser General Public    *
+ *   License along with CHRIS.                                           *
+ *   If not, see <http://www.gnu.org/licenses/>.                         *
+ *                                                                       *
+ * ********************************************************************* */
+
+
+
+package edu.unisa.gamebots.pathfinder;
+
+
+import java.util.*;
+import java.io.*;
+
+import edu.unisa.chris.agent.*;
+import edu.unisa.chris.orientation.*;
+import edu.unisa.chris.decision.*;
+import edu.unisa.chris.action.*;
+import edu.unisa.gamebots.chris.*;
+import edu.unisa.gamebots.utjackinterface.*;
+import edu.unisa.gamebots.utjackinterface.controller.*;
+import edu.unisa.gamebots.utjackinterface.caps.sync.*;
+import edu.unisa.gamebots.utjackinterface.caps.async.*;
+import edu.unisa.gamebots.utjackinterface.caps.move.*;
+import aos.jack.jak.cursor.Cursor;
+
+/**
+ * @author Christos Sioutis
+ */
+
+
+agent PathFinder extends UtChrisBot
+{
+        #posts event Goal goal;
+
+	#has capability UtSyncCap snc;
+	#has capability UtAsyncCap asnc;
+        #has capability CHRIS chris;
+        #handles event UtNewNavEvent;
+        #uses plan UtNewNavPlan;
+
+        #has capability UtMoveCap moveCap;
+        #handles event UtMoveEvent;
+
+        #private data ExploredNavs explored();
+
+	#private data UtChrisState ut(chris.orientationStage.currentStateInstance,snc.self, snc.game, snc.players, snc.navs, snc.movs, snc.doms, snc.flags, snc.invs, asnc.async);
+
+        #handles event Target;
+        #uses plan LookAroundPlan;
+        #uses plan HGoToFlagPlan;
+        #uses plan EGoToFlagPlan;
+        #uses plan MonitorHomeFlagPlan;
+        #uses plan MonitorEnemyFlagPlan;
+
+        #handles event ActionEvent;
+        #uses plan GoToNavPlan;
+
+        String server;
+
+	PathFinder(String goals, String name, int team){
+		super(name, team);
+                chris.decisionStage.goals.read(goals);
+                initLearning();
+	}
+
+        public void initLearning(){
+            try{
+                chris.learningStage.learningGoals.add("HGoToNextNav",new FindHomeFlagLearningGoal());
+                chris.learningStage.learningGoals.add("EGoToNextNav",new FindEnemyFlagLearningGoal());
+            }
+            catch(Exception e){
+                System.out.println(e);
+            }        
+        }
+
+        public void connect(String serverName){
+                server = serverName;
+		connect(ut, server);
+        }
+
+        public void saveLearning(String fileName){
+            chris.saveLearning(fileName);
+        }
+
+        public void loadLearning(String fileName){
+            chris.loadLearning(fileName);
+        }
+        
+        public void updateWorldState(Object informationValues){
+        }
+
+        public void loadExplorationData(String fileName){
+            explored.read(fileName);
+        }
+
+        public void saveExplorationData(String fileName){
+            explored.write(fileName);
+        }
+
+        public List getActionsAvailable(StateInstance state){
+            List list=null;   
+            try{
+                UtChrisStateInstance s = (UtChrisStateInstance) state;
+                UtNav closest = s.closeToWhat(s.self.location);
+                if(closest!=null){
+                    list = explored.get(closest.id);
+                }
+                if(list == null || list.size()==0){
+                    list = s.getReachableNavs(true);
+                }
+                if(list == null || list.size()==0){
+                    list = closestNavs(5, s.self.location, s.navs);
+                }
+            }
+            catch(Exception e){
+                System.out.println("Error getting actions:");
+                e.printStackTrace();
+            }
+            for(int i=0; i< list.size(); i++){
+                list.set(i,new NavChoice((UtNav)list.get(i)));
+            }
+            return list;
+        }
+
+
+        public List closestNavs(int numNavs, UtCoordinate location, List navs){
+            UtNav[] closest = new UtNav[numNavs];
+            double[] distance = new double[numNavs];
+            UtNav nTmp,nTmp2;
+            double dTmp,dTmp2;
+            nTmp = (UtNav)navs.get(0);
+            closest[0] = nTmp;
+            distance[0] = location.distanceFrom(nTmp.location);
+            for(int i=1; i< navs.size(); i++){
+                nTmp = (UtNav)navs.get(i);
+                dTmp = location.distanceFrom(nTmp.location);
+                for(int j=0; j<numNavs && dTmp < distance[j] ; j++){
+                        //keep backup of previous closest/distance at j
+                        dTmp2 = distance[j];
+                        nTmp2 = closest[j];
+                        //replace with new info
+                        distance[j] = dTmp;
+                        closest[j] = nTmp;
+                        //reset dTmp and nTmp with replaced info so that it van be proparaged into next slot of the array
+                        dTmp = dTmp2;
+                        nTmp = nTmp2;
+                }
+            }
+            List list = new LinkedList();
+            for(int i=0; i<numNavs && closest[i]!=null; i++)
+                list.add(closest[i]);
+            return list;
+        }
+
+        public void activateDecisionProcess(Object rawData){
+        }
+
+        public void findPath(){
+            postEventAndWait(goal.goal("FindPath","_Agent_",null));
+        }
+}

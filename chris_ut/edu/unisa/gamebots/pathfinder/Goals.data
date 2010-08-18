@@ -1,0 +1,134 @@
+<TupleTable
+   :tuples (
+      <Goals__Tuple
+         :name "FindPath"
+         :parent "_Agent_"
+         :type 0
+         :active :false
+         :priority 1
+         :successCount 0
+         :failureCount 0
+         :proceduralIndex 0
+      >
+      <Goals__Tuple
+         :name "HomePath"
+         :parent "FindPath"
+         :type 0
+         :active :false
+         :priority 1
+         :successCount 0
+         :failureCount 0
+         :proceduralIndex 0
+      >
+      <Goals__Tuple
+         :name "FindHomeFlag"
+         :parent "HomePath"
+         :type 4
+         :active :false
+         :priority 1
+         :successCount 0
+         :failureCount 0
+         :proceduralIndex 0
+      >
+      <Goals__Tuple
+         :name "HSearch"
+         :parent "FindHomeFlag"
+         :type 3
+         :active :false
+         :priority 1
+         :successCount 0
+         :failureCount 0
+         :proceduralIndex 0
+      >
+      <Goals__Tuple
+         :name "LookAround"
+         :parent "HSearch"
+         :type 0
+         :active :false
+         :priority 1
+         :successCount 0
+         :failureCount 0
+         :proceduralIndex 0
+      >
+      <Goals__Tuple
+         :name "HGoToNextNav"
+         :parent "HSearch"
+         :type 0
+         :active :false
+         :priority 1
+         :successCount 0
+         :failureCount 0
+         :proceduralIndex 1
+      >
+      <Goals__Tuple
+         :name "MonitorHomeFlag"
+         :parent "HomePath"
+         :type 4
+         :active :false
+         :priority 1
+         :successCount 0
+         :failureCount 0
+         :proceduralIndex 1
+      >
+      <Goals__Tuple
+         :name "EnemyPath"
+         :parent "FindPath"
+         :type 0
+         :active :false
+         :priority 1
+         :successCount 0
+         :failureCount 0
+         :proceduralIndex 1
+      >
+      <Goals__Tuple
+         :name "FindEnemyFlag"
+         :parent "EnemyPath"
+         :type 4
+         :active :false
+         :priority 1
+         :successCount 0
+         :failureCount 0
+         :proceduralIndex 0
+      >
+      <Goals__Tuple
+         :name "ESearch"
+         :parent "FindEnemyFlag"
+         :type 3
+         :active :false
+         :priority 1
+         :successCount 0
+         :failureCount 0
+         :proceduralIndex 0
+      >
+      <Goals__Tuple
+         :name "LookAround"
+         :parent "ESearch"
+         :type 0
+         :active :false
+         :priority 1
+         :successCount 0
+         :failureCount 0
+         :proceduralIndex 0
+      >
+      <Goals__Tuple
+         :name "EGoToNextNav"
+         :parent "ESearch"
+         :type 0
+         :active :false
+         :priority 1
+         :successCount 0
+         :failureCount 0
+         :proceduralIndex 1
+      >
+      <Goals__Tuple
+         :name "MonitorEnemyFlag"
+         :parent "EnemyPath"
+         :type 4
+         :active :false
+         :priority 1
+         :successCount 0
+         :failureCount 0
+         :proceduralIndex 1
+      >
+   )
+>
