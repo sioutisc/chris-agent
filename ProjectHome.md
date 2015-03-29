@@ -1,0 +1,1 @@
+The Cognitive Hybrid Reasoning Intelligent Agent System (CHRIS) is an implementation of the conceptual model described in Sioutis (2006) using the JACK agent development environment. The new framework provides an abstract way to create learning agents without the need to worry about how the internal learning algorithms operate.
